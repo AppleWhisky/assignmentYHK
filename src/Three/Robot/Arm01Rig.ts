@@ -15,21 +15,21 @@ const _size = new Vector3();
 const JOINT_ORDER: string[] = [
   'Arm01_Base_Rotation', // Robot Base Rotation
   'Arm01_Arm_Rotation',
-  'Arm01_End_Rotation',
   'Arm02_Base_Rotation',
   'Arm02_Arm_Rotation',
-  'Arm02_End_Rotation',
   'Arm03_Base_Rotation',
   'Arm03_End_Rotation',
   'Tip_Rotation',
 ];
 
+// Joints present in the GLB but intentionally not exposed as controllable DOFs.
+// (These were observed to move redundantly with their corresponding joints.)
+const EXCLUDED_JOINTS = new Set<string>(['Arm01_End_Rotation', 'Arm02_End_Rotation']);
+
 const DEFAULT_AXIS_BY_NAME: Record<string, Axis> = {
   // Normal cylinder shape joints
   Arm01_Arm_Rotation: 'y',
-  Arm01_End_Rotation: 'y',
   Arm02_Arm_Rotation: 'y',
-  Arm02_End_Rotation: 'y',
   Arm03_End_Rotation: 'y',
 
   // X axis joints (vertical-long cylinders on the sides)
@@ -49,10 +49,8 @@ const LABEL_BY_NAME: Record<string, string> = {
 const HOME_DEG_BY_NAME: Record<string, number> = {
   Arm01_Base_Rotation: 0,
   Arm01_Arm_Rotation: 0,
-  Arm01_End_Rotation: 0,
   Arm02_Base_Rotation: 0,
   Arm02_Arm_Rotation: 0,
-  Arm02_End_Rotation: 0,
   Arm03_Base_Rotation: 0,
   Arm03_End_Rotation: 0,
   Tip_Rotation: 0,
@@ -97,7 +95,8 @@ export function buildArm01Rig(root: Object3D, axisOverrides: Record<string, Axis
     if (obj.name && obj.name.endsWith('_Rotation')) rotationNodes.push(obj);
   });
 
-  const byName = new Map(rotationNodes.map((n) => [n.name, n] as const));
+  const includedRotationNodes = rotationNodes.filter((n) => !EXCLUDED_JOINTS.has(n.name));
+  const byName = new Map(includedRotationNodes.map((n) => [n.name, n] as const));
   const ordered: Object3D[] = [];
 
   // 1) Put known joints in desired order
@@ -106,7 +105,7 @@ export function buildArm01Rig(root: Object3D, axisOverrides: Record<string, Axis
     if (n) ordered.push(n);
   }
   // 2) Append any remaining `_Rotation` nodes (stable alpha order)
-  const remaining = rotationNodes
+  const remaining = includedRotationNodes
     .filter((n) => !JOINT_ORDER.includes(n.name))
     .sort((a, b) => a.name.localeCompare(b.name));
   ordered.push(...remaining);

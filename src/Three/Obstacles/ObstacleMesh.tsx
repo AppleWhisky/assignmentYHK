@@ -48,6 +48,11 @@ export const ObstacleMesh = (props: {
       scale={props.obstacle.size}
       onPointerDown={(e) => {
         e.stopPropagation();
+
+        // UX guard: don't steal selection while any gizmo is actively dragging.
+        const s = useSimStore.getState();
+        if (s.transformInteracting) return;
+
         setSelected({ kind: 'obstacle', id: props.obstacle.id });
       }}
       userData={{ kind: 'obstacle', id: props.obstacle.id }}

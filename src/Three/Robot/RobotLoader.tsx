@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { Mesh } from 'three';
 import type { Object3D, Quaternion } from 'three';
 import arm01Url from '@/assets/arm01.glb?url';
 import { useObjectGLTF, preloadObjectGLTF } from '@/Three/loaders/ObjectLoader';
@@ -28,6 +29,7 @@ export const RobotLoader = (props: { onReady?: (rt: RobotRuntime) => void }) => 
   const setJointGizmoActive = useSimStore((s) => s.setJointGizmoActive);
   const onReadyRef = useRef(props.onReady);
   const didNotifyRef = useRef(false);
+  const didCloneMatsRef = useRef(false);
 
   useEffect(() => {
     onReadyRef.current = props.onReady;
@@ -52,6 +54,18 @@ export const RobotLoader = (props: { onReady?: (rt: RobotRuntime) => void }) => 
   useEffect(() => {
     if (didNotifyRef.current) return;
     didNotifyRef.current = true;
+
+    // Ensure each mesh has its own material instance so collision tinting affects
+    // only the colliding mesh (GLB often shares materials between meshes).
+    if (!didCloneMatsRef.current) {
+      didCloneMatsRef.current = true;
+      runtime.root.traverse((obj) => {
+        if (!(obj instanceof Mesh)) return;
+        const m = obj.material;
+        obj.material = Array.isArray(m) ? m.map((x) => x.clone()) : m.clone();
+      });
+    }
+
     onReadyRef.current?.(runtime);
   }, [runtime]);
 

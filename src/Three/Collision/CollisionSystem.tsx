@@ -1,15 +1,16 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { Box3, Color, Mesh, MeshStandardMaterial } from 'three';
+import type { Material } from 'three';
+import { Box3, Color, Mesh } from 'three';
 import type { Object3D } from 'three';
 import { useSimStore } from '@/store/useSimStore';
 import { boxDistance } from '@/utils/box';
 
 type SavedMaterial = {
-  mat: MeshStandardMaterial;
-  color: Color;
-  emissive: Color;
-  emissiveIntensity: number;
+  mat: Material;
+  color?: Color;
+  emissive?: Color;
+  emissiveIntensity?: number;
 };
 
 const WARN_COLOR = new Color('#ff9a3d');
@@ -28,30 +29,16 @@ export const CollisionSystem = (props: {
 
   const robotMeshes = useMemo(() => {
     if (!props.robotRoot) return [] as Mesh[];
-    const meshes: Mesh[] = [];
-    props.robotRoot.traverse((obj) => {
-      if (obj instanceof Mesh) meshes.push(obj);
-    });
-    for (const m of meshes) {
-      if (m.geometry && !m.geometry.boundingBox) m.geometry.computeBoundingBox?.();
-    }
-    return meshes;
+    return collectRobotMeshes(props.robotRoot);
   }, [props.robotRoot]);
 
-  const saved = useRef<WeakMap<Mesh, SavedMaterial>>(new WeakMap());
+  const saved = useRef<WeakMap<Mesh, SavedMaterial[]>>(new WeakMap());
 
   useEffect(() => {
     // Seed saved material snapshots
     for (const mesh of robotMeshes) {
-      const mat = mesh.material;
-      if (!(mat instanceof MeshStandardMaterial)) continue;
       if (!saved.current.has(mesh)) {
-        saved.current.set(mesh, {
-          mat,
-          color: mat.color.clone(),
-          emissive: mat.emissive.clone(),
-          emissiveIntensity: mat.emissiveIntensity,
-        });
+        saved.current.set(mesh, snapshotMaterials(mesh.material));
       }
     }
   }, [robotMeshes]);
@@ -69,7 +56,13 @@ export const CollisionSystem = (props: {
     if (obstacleEntries.length === 0) {
       if (severityRef.current !== 'none') {
         severityRef.current = 'none';
-        setCollision({ severity: 'none', collidingMeshNames: [], collidingObstacleIds: [] });
+        setCollision({
+          severity: 'none',
+          warningMeshNames: [],
+          collidingMeshNames: [],
+          warningObstacleIds: [],
+          collidingObstacleIds: [],
+        });
       }
       restoreAll(robotMeshes, saved.current);
       return;
@@ -81,7 +74,9 @@ export const CollisionSystem = (props: {
     const collidingObstacles = new Set<string>();
 
     for (const mesh of robotMeshes) {
-      if (!mesh.geometry?.boundingBox) continue;
+      if (!mesh.geometry) continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox?.();
+      if (!mesh.geometry.boundingBox) continue;
       _boxA.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
 
       for (const [id, obj] of obstacleEntries) {
@@ -111,10 +106,10 @@ export const CollisionSystem = (props: {
 
     setCollision({
       severity,
-      collidingMeshNames: Array.from(severity === 'collision' ? collidingMeshes : warningMeshes),
-      collidingObstacleIds: Array.from(
-        severity === 'collision' ? collidingObstacles : warningObstacles,
-      ),
+      warningMeshNames: Array.from(warningMeshes),
+      collidingMeshNames: Array.from(collidingMeshes),
+      warningObstacleIds: Array.from(warningObstacles),
+      collidingObstacleIds: Array.from(collidingObstacles),
     });
 
     applyTint(robotMeshes, saved.current, collidingMeshes, warningMeshes);
@@ -123,41 +118,82 @@ export const CollisionSystem = (props: {
   return null;
 };
 
-function restoreAll(meshes: Mesh[], saved: WeakMap<Mesh, SavedMaterial>) {
+function restoreAll(meshes: Mesh[], saved: WeakMap<Mesh, SavedMaterial[]>) {
   for (const mesh of meshes) {
-    const snapshot = saved.get(mesh);
-    if (!snapshot) continue;
-    snapshot.mat.color.copy(snapshot.color);
-    snapshot.mat.emissive.copy(snapshot.emissive);
-    snapshot.mat.emissiveIntensity = snapshot.emissiveIntensity;
+    const snapshots = saved.get(mesh);
+    if (!snapshots) continue;
+    for (const s of snapshots) restoreSnapshot(s);
   }
 }
 
 function applyTint(
   meshes: Mesh[],
-  saved: WeakMap<Mesh, SavedMaterial>,
+  saved: WeakMap<Mesh, SavedMaterial[]>,
   colliding: Set<string>,
   warning: Set<string>,
 ) {
   for (const mesh of meshes) {
-    const mat = mesh.material;
-    if (!(mat instanceof MeshStandardMaterial)) continue;
     const key = mesh.name || mesh.uuid;
-    const snapshot = saved.get(mesh);
-    if (!snapshot) continue;
+    const snapshots = saved.get(mesh);
+    if (!snapshots) continue;
 
     if (colliding.has(key)) {
-      mat.color.copy(COLLISION_COLOR);
-      mat.emissive.copy(COLLISION_COLOR);
-      mat.emissiveIntensity = 0.35;
+      for (const s of snapshots) tintSnapshot(s, COLLISION_COLOR, 0.35);
     } else if (warning.has(key)) {
-      mat.color.copy(WARN_COLOR);
-      mat.emissive.copy(WARN_COLOR);
-      mat.emissiveIntensity = 0.25;
+      for (const s of snapshots) tintSnapshot(s, WARN_COLOR, 0.25);
     } else {
-      mat.color.copy(snapshot.color);
-      mat.emissive.copy(snapshot.emissive);
-      mat.emissiveIntensity = snapshot.emissiveIntensity;
+      for (const s of snapshots) restoreSnapshot(s);
     }
   }
+}
+
+function snapshotMaterials(m: Mesh['material']): SavedMaterial[] {
+  const mats = Array.isArray(m) ? m : [m];
+  return mats.map((mat) => {
+    const matAny = mat as unknown as {
+      color?: Color;
+      emissive?: Color;
+      emissiveIntensity?: number;
+    };
+    return {
+      mat,
+      color: matAny.color?.clone(),
+      emissive: matAny.emissive?.clone(),
+      emissiveIntensity: typeof matAny.emissiveIntensity === 'number' ? matAny.emissiveIntensity : undefined,
+    };
+  });
+}
+
+function restoreSnapshot(s: SavedMaterial) {
+  const matAny = s.mat as unknown as {
+    color?: Color;
+    emissive?: Color;
+    emissiveIntensity?: number;
+  };
+  if (s.color && matAny.color) matAny.color.copy(s.color);
+  if (s.emissive && matAny.emissive) matAny.emissive.copy(s.emissive);
+  if (typeof s.emissiveIntensity === 'number' && typeof matAny.emissiveIntensity === 'number') {
+    matAny.emissiveIntensity = s.emissiveIntensity;
+  }
+}
+
+function tintSnapshot(s: SavedMaterial, c: Color, emissiveIntensity: number) {
+  const matAny = s.mat as unknown as {
+    color?: Color;
+    emissive?: Color;
+    emissiveIntensity?: number;
+  };
+  if (matAny.color) matAny.color.copy(c);
+  if (matAny.emissive) matAny.emissive.copy(c);
+  if (typeof matAny.emissiveIntensity === 'number') matAny.emissiveIntensity = emissiveIntensity;
+}
+
+function collectRobotMeshes(root: Object3D): Mesh[] {
+  const meshes: Mesh[] = [];
+  root.traverse((obj) => {
+    if (!(obj instanceof Mesh)) return;
+    if (!obj.geometry) return;
+    meshes.push(obj);
+  });
+  return meshes;
 }

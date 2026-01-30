@@ -1,18 +1,41 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
-export const CollapsiblePanel = (props: { title: string; children: ReactNode }) => {
+export const CollapsiblePanel = (props: {
+  title: string;
+  children: ReactNode;
+  dockSide?: 'left' | 'right';
+}) => {
   const [collapsed, setCollapsed] = useState(false);
+  const dockSide = props.dockSide ?? 'right';
+
+  const arrow =
+    dockSide === 'right'
+      ? collapsed
+        ? '◀'
+        : '▶'
+      : // Left panel is mirrored: handle is on the right edge.
+        collapsed
+        ? '▶'
+        : '◀';
 
   return (
-    <div className={collapsed ? 'panelShell isCollapsed' : 'panelShell'}>
+    <div
+      className={[
+        'panelShell',
+        collapsed ? 'isCollapsed' : null,
+        dockSide === 'left' ? 'isDockLeft' : 'isDockRight',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <button
         type="button"
         className="panelDockToggle"
         aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
         onClick={() => setCollapsed((v) => !v)}
       >
-        {collapsed ? '◀' : '▶'}
+        {arrow}
       </button>
       <div className="panelFrame">
         <div className="panelHeader">

@@ -3,6 +3,8 @@ import { useSimStore } from '@/store/useSimStore';
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
+const SNAP_DEGS = [-180, -135, -90, -45, 0, 45, 90, 135, 180] as const;
+
 const HoldButton = (props: { label: string; onStep: () => void; children: ReactNode }) => {
   const timeoutRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -48,11 +50,13 @@ export const JogPanel = () => {
   const setJointGizmoActive = useSimStore((s) => s.setJointGizmoActive);
   const setJointAngle = useSimStore((s) => s.setJointAngle);
   const nudgeJoint = useSimStore((s) => s.nudgeJoint);
-  const addObstacle = useSimStore((s) => s.addObstacle);
   const resetRobotPose = useSimStore((s) => s.resetRobotPose);
-  const obstacles = useSimStore((s) => s.obstacles);
-  const removeObstacle = useSimStore((s) => s.removeObstacle);
+  const robotYawRad = useSimStore((s) => s.robotYawRad);
+  const setRobotYawRad = useSimStore((s) => s.setRobotYawRad);
+  const nudgeRobotYaw = useSimStore((s) => s.nudgeRobotYaw);
   const collision = useSimStore((s) => s.collision);
+  const showCollisionBoxes = useSimStore((s) => s.showCollisionBoxes);
+  const setShowCollisionBoxes = useSimStore((s) => s.setShowCollisionBoxes);
 
   return (
     <div>
@@ -67,10 +71,115 @@ export const JogPanel = () => {
         </span>
       </div>
 
+      <label
+        style={{
+          marginTop: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 12,
+          color: 'var(--muted)',
+          userSelect: 'none',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={showCollisionBoxes}
+          onChange={(e) => setShowCollisionBoxes(e.target.checked)}
+        />
+        Show collision bounding boxes
+      </label>
+
       <div className="btnRow" style={{ marginTop: 10 }}>
-        <button onClick={() => addObstacle()}>Add obstacle box</button>
         <button onClick={() => setSelected({ kind: 'robot' })}>Move robot</button>
         <button onClick={() => resetRobotPose()}>Reset robot</button>
+      </div>
+
+      <h2 style={{ marginTop: 12 }}>Robot Base</h2>
+      <div style={{ marginTop: 10 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 34px 34px 64px',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          <button
+            type="button"
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'baseline',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
+              padding: '8px 10px',
+              fontSize: 12,
+              lineHeight: 1.1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            }}
+            onClick={() => {
+              setJointGizmoActive(false);
+              setSelected({ kind: 'robot' });
+            }}
+          >
+            <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Base Rotation
+            </span>
+            <span style={{ color: 'var(--muted)' }}>(Y)</span>
+          </button>
+          <HoldButton
+            label="Nudge Base Rotation -"
+            onStep={() => {
+              setJointGizmoActive(false);
+              setSelected({ kind: 'robot' });
+              nudgeRobotYaw(-1);
+            }}
+          >
+            -
+          </HoldButton>
+          <HoldButton
+            label="Nudge Base Rotation +"
+            onStep={() => {
+              setJointGizmoActive(false);
+              setSelected({ kind: 'robot' });
+              nudgeRobotYaw(1);
+            }}
+          >
+            +
+          </HoldButton>
+          <output
+            style={{
+              justifySelf: 'end',
+              textAlign: 'right',
+              fontVariantNumeric: 'tabular-nums',
+              minWidth: 64,
+            }}
+          >
+            {radToDeg(robotYawRad).toFixed(1)}°
+          </output>
+        </div>
+        <input
+          className="slider"
+          type="range"
+          min={-180}
+          max={180}
+          step={0.5}
+          list="zero-tick-base-yaw"
+          value={clamp(radToDeg(robotYawRad), -180, 180)}
+          onChange={(e) => {
+            setJointGizmoActive(false);
+            setSelected({ kind: 'robot' });
+            setRobotYawRad(degToRad(Number(e.target.value)));
+          }}
+        />
+        <datalist id="zero-tick-base-yaw">
+          {SNAP_DEGS.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
       </div>
 
       {joints.length === 0 ? (
@@ -173,30 +282,13 @@ export const JogPanel = () => {
               }}
             />
             <datalist id={`zero-tick-${j.name}`}>
-              <option value={0} />
+              {SNAP_DEGS.filter((v) => v >= minDeg && v <= maxDeg).map((v) => (
+                <option key={v} value={v} />
+              ))}
             </datalist>
           </div>
         );
       })}
-
-      <h2 style={{ marginTop: 14 }}>Obstacles</h2>
-      {obstacles.length ? (
-        <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
-          {obstacles.map((o) => (
-            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <button
-                style={{ flex: 1, textAlign: 'left' as const }}
-                onClick={() => setSelected({ kind: 'obstacle', id: o.id })}
-              >
-                {o.name}
-              </button>
-              <button onClick={() => removeObstacle(o.id)}>Delete</button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>No obstacles yet.</div>
-      )}
     </div>
   );
 };

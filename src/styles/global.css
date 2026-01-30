@@ -45,10 +45,17 @@ body {
 .sidePanel {
   position: absolute;
   top: 16px;
-  right: 16px;
   height: calc(100% - 32px);
   max-height: calc(100% - 32px);
   overflow: visible;
+}
+
+.sidePanelRight {
+  right: 16px;
+}
+
+.sidePanelLeft {
+  left: 16px;
 }
 
 .panelShell {
@@ -64,20 +71,29 @@ body {
 
 .panelDockToggle {
   position: absolute;
-  /* pull the handle further left so it doesn't overlap panel border */
-  left: -34px;
   top: 50%;
   transform: translateY(-50%);
   width: 28px;
   height: 44px;
   padding: 0;
-  border-radius: 12px 0 0 12px;
   border: 1px solid var(--panel-border);
   /* fully opaque so it doesn't blend with panel */
   background: rgb(248, 249, 252);
   color: var(--text);
   z-index: 5;
   box-shadow: 0 6px 18px rgba(15, 18, 25, 0.12);
+}
+
+.panelShell.isDockRight .panelDockToggle {
+  /* right-side panel: handle on the left edge */
+  left: -34px;
+  border-radius: 12px 0 0 12px;
+}
+
+.panelShell.isDockLeft .panelDockToggle {
+  /* left-side panel: handle on the right edge */
+  right: -34px;
+  border-radius: 0 12px 12px 0;
 }
 
 .panelFrame {
@@ -199,6 +215,21 @@ button {
 
 button:hover {
   border-color: rgba(45, 108, 255, 0.45);
+}
+
+input[type='number'] {
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+input[type='number']:focus {
+  outline: none;
+  border-color: rgba(45, 108, 255, 0.55);
 }
 
 .badge {

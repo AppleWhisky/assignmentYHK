@@ -13,6 +13,7 @@ import { JointGizmo } from '@/Three/Gizmos/JointGizmo';
 import { ObstaclesLayer } from '@/Three/Obstacles/ObstaclesLayer';
 import { ObstacleGizmo } from '@/Three/Gizmos/ObstacleGizmo';
 import { CollisionSystem } from '@/Three/Collision/CollisionSystem';
+import { CollisionDebugBoxes } from '@/Three/Collision/CollisionDebugBoxes';
 import { Light } from '@/Three/Light';
 
 const NO_RAYCAST = () => {
@@ -31,6 +32,7 @@ export const RobotScene = () => {
         window.setTimeout(() => {
           const s = useSimStore.getState();
           if (s.transformInteracting) return;
+          s.setTransformInteracting(false);
           s.setJointGizmoActive(false);
           s.setSelected(null);
         }, 0);
@@ -48,6 +50,8 @@ export const RobotScene = () => {
 
 const _box = new Box3();
 const _size = new Vector3();
+const _pivotBox = new Box3();
+const _pivotCenter = new Vector3();
 
 const SceneContents = () => {
   const { camera, gl } = useThree();
@@ -59,12 +63,15 @@ const SceneContents = () => {
   const selected = useSimStore((s) => s.selected);
   const jointGizmoActive = useSimStore((s) => s.jointGizmoActive);
   const robotPosition = useSimStore((s) => s.robotPosition);
+  const robotYawRad = useSimStore((s) => s.robotYawRad);
   const setRobotPositionXZ = useSimStore((s) => s.setRobotPositionXZ);
   const setTransformInteracting = useSimStore((s) => s.setTransformInteracting);
+  const transformInteracting = useSimStore((s) => s.transformInteracting);
 
   const [robotRt, setRobotRt] = useState<RobotRuntime | null>(null);
   const [robotScale, setRobotScale] = useState(1);
   const [robotYOffset, setRobotYOffset] = useState(0);
+  const [robotBasePivotLocalXZ, setRobotBasePivotLocalXZ] = useState<[number, number]>([0, 0]);
   const didNormalizeRef = useRef(false);
   const robotMoveRef = useRef<Object3D | null>(null);
   const [robotMoveObj, setRobotMoveObj] = useState<Object3D | null>(null);
@@ -75,7 +82,6 @@ const SceneContents = () => {
   }, []);
 
   const obstacleObjectById = useMemo(() => new Map<string, Object3D>(), []);
-  const [isDragging, setIsDragging] = useState(false);
 
   // Keep the robot move-group in sync with store state (important for reset).
   useEffect(() => {
@@ -83,7 +89,18 @@ const SceneContents = () => {
     if (!o) return;
     o.position.set(robotPosition[0], 0, robotPosition[2]);
     o.updateMatrixWorld(true);
-  }, [robotPosition]);
+  }, [robotPosition, robotYawRad]);
+
+  // Safety: if TransformControls ever leaves us stuck, releasing pointer anywhere should recover.
+  useEffect(() => {
+    const onUp = () => setTransformInteracting(false);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [setTransformInteracting]);
 
   useEffect(() => {
     if (!robotMoveControlsRef.current || !robotMoveObj) return;
@@ -96,15 +113,12 @@ const SceneContents = () => {
     const onDraggingChanged = (e: unknown) => {
       const v = (e as { value?: unknown } | null)?.value;
       const active = Boolean(v);
-      setIsDragging(active);
       setTransformInteracting(active);
     };
     const onMouseDown = () => {
-      setIsDragging(true);
       setTransformInteracting(true);
     };
     const onMouseUp = () => {
-      setIsDragging(false);
       setTransformInteracting(false);
     };
     const onObjectChange = () => {
@@ -174,28 +188,53 @@ const SceneContents = () => {
         />
       </mesh>
 
-      <OrbitControls makeDefault enabled={!isDragging} />
+      <OrbitControls makeDefault enabled={!transformInteracting} />
 
-      {/* Outer group: robot translation (XZ), inner group: normalization scale + ground offset */}
-      <group ref={setRobotMoveGroup} position={[robotPosition[0], 0, robotPosition[2]]}>
-        <group position={[0, robotYOffset, 0]} scale={[robotScale, robotScale, robotScale]}>
-          <RobotLoader
-            onReady={(rt) => {
-              setRobotRt(rt);
-              if (didNormalizeRef.current) return;
-              didNormalizeRef.current = true;
+      {/* Outer group: robot translation (XZ). Rotation is applied around a Base pivot below. */}
+      <group
+        ref={setRobotMoveGroup}
+        position={[robotPosition[0], 0, robotPosition[2]]}
+      >
+        {/* Yaw pivot group: rotate around Base center so yaw doesn't "move" the robot. */}
+        <group
+          position={[robotBasePivotLocalXZ[0] * robotScale, 0, robotBasePivotLocalXZ[1] * robotScale]}
+          rotation={[0, robotYawRad, 0]}
+        >
+          <group position={[-robotBasePivotLocalXZ[0] * robotScale, 0, -robotBasePivotLocalXZ[1] * robotScale]}>
+            <group position={[0, robotYOffset, 0]} scale={[robotScale, robotScale, robotScale]}>
+              <RobotLoader
+                onReady={(rt) => {
+                  setRobotRt(rt);
+                  if (didNormalizeRef.current) return;
+                  didNormalizeRef.current = true;
 
-              _box.setFromObject(rt.root);
-              _box.getSize(_size);
-              const maxDim = Math.max(_size.x, _size.y, _size.z);
-              if (Number.isFinite(maxDim) && maxDim > 0) {
-                const targetMax = 1.6;
-                const s = targetMax / maxDim;
-                setRobotScale(s);
-                setRobotYOffset(-_box.min.y * s);
-              }
-            }}
-          />
+                  _box.setFromObject(rt.root);
+                  _box.getSize(_size);
+                  const maxDim = Math.max(_size.x, _size.y, _size.z);
+                  if (Number.isFinite(maxDim) && maxDim > 0) {
+                    const targetMax = 1.6;
+                    const s = targetMax / maxDim;
+                    setRobotScale(s);
+                    setRobotYOffset(-_box.min.y * s);
+                  }
+
+                  // Find Base pivot (XZ) in root-local space for stable yaw rotation.
+                  let baseObj: Object3D | null = null;
+                  rt.root.traverse((o) => {
+                    if (baseObj) return;
+                    if (o.name === 'Base') baseObj = o;
+                  });
+                  if (baseObj) {
+                    _pivotBox.setFromObject(baseObj);
+                    _pivotBox.getCenter(_pivotCenter);
+                    setRobotBasePivotLocalXZ([_pivotCenter.x, _pivotCenter.z]);
+                  } else {
+                    setRobotBasePivotLocalXZ([0, 0]);
+                  }
+                }}
+              />
+            </group>
+          </group>
         </group>
       </group>
 
@@ -209,6 +248,18 @@ const SceneContents = () => {
           showX
           showY={false}
           showZ
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            setTransformInteracting(true);
+          }}
+          onPointerUp={(e) => {
+            e.stopPropagation();
+            setTransformInteracting(false);
+          }}
+          onPointerCancel={(e) => {
+            e.stopPropagation();
+            setTransformInteracting(false);
+          }}
         />
       ) : null}
 
@@ -218,14 +269,14 @@ const SceneContents = () => {
           jointNodeByName={
             new Map(Array.from(robotRt.jointByName.entries()).map(([k, v]) => [k, v.object]))
           }
-          onDraggingChange={setIsDragging}
         />
       ) : null}
 
       <ObstaclesLayer obstacleObjectById={obstacleObjectById} />
-      <ObstacleGizmo obstacleObjectById={obstacleObjectById} onDraggingChange={setIsDragging} />
+      <ObstacleGizmo obstacleObjectById={obstacleObjectById} />
 
       <CollisionSystem robotRoot={robotRt?.root ?? null} obstacleObjectById={obstacleObjectById} />
+      <CollisionDebugBoxes robotRoot={robotRt?.root ?? null} obstacleObjectById={obstacleObjectById} />
     </>
   );
 };

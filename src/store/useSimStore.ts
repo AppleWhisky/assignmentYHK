@@ -33,7 +33,9 @@ export type CollisionSeverity = 'none' | 'warning' | 'collision';
 
 export type CollisionState = {
   severity: CollisionSeverity;
+  warningMeshNames: string[];
   collidingMeshNames: string[];
+  warningObstacleIds: string[];
   collidingObstacleIds: string[];
 };
 
@@ -42,6 +44,10 @@ export type SimState = {
   camera: Camera | null;
   gl: WebGLRenderer | null;
   setThree: (v: { camera: Camera; gl: WebGLRenderer }) => void;
+
+  // Debug / dev flags
+  showCollisionBoxes: boolean;
+  setShowCollisionBoxes: (show: boolean) => void;
 
   // Robot slice
   joints: JointState[];
@@ -57,7 +63,10 @@ export type SimState = {
 
   // Robot pose (world)
   robotPosition: [number, number, number];
+  robotYawRad: number;
   setRobotPositionXZ: (x: number, z: number) => void;
+  setRobotYawRad: (yawRad: number) => void;
+  nudgeRobotYaw: (dir: 1 | -1) => void;
   resetRobotPosition: () => void;
   resetRobotPose: () => void;
 
@@ -99,6 +108,9 @@ export const useSimStore = create<SimState>((set, get) => ({
   gl: null,
   setThree: ({ camera, gl }) => set({ camera, gl }),
 
+  showCollisionBoxes: false,
+  setShowCollisionBoxes: (show) => set({ showCollisionBoxes: show }),
+
   joints: [],
   jointAxisOverrides: {},
   setJoints: (joints) => set({ joints }),
@@ -126,16 +138,22 @@ export const useSimStore = create<SimState>((set, get) => ({
   setTransformInteracting: (active) => set({ transformInteracting: active }),
 
   robotPosition: [0, 0, 0],
+  robotYawRad: 0,
   setRobotPositionXZ: (x, z) =>
     set((s) => ({
       robotPosition: [x, s.robotPosition[1], z],
     })),
+  setRobotYawRad: (yawRad) => set({ robotYawRad: yawRad }),
+  nudgeRobotYaw: (dir) => set((s) => ({ robotYawRad: s.robotYawRad + dir * DEFAULT_JOINT_STEP_RAD })),
   resetRobotPosition: () => set({ robotPosition: [0, 0, 0] }),
   resetRobotPose: () =>
     set((s) => ({
       robotPosition: [0, 0, 0],
+      robotYawRad: 0,
       joints: s.joints.map((j) => ({ ...j, angleRad: j.homeAngleRad })),
       selected: null,
+      jointGizmoActive: false,
+      transformInteracting: false,
     })),
 
   obstacles: [],
@@ -189,7 +207,13 @@ export const useSimStore = create<SimState>((set, get) => ({
       jointGizmoActive: selected?.kind === 'joint' ? s.jointGizmoActive : false,
     })),
 
-  collision: { severity: 'none', collidingMeshNames: [], collidingObstacleIds: [] },
+  collision: {
+    severity: 'none',
+    warningMeshNames: [],
+    collidingMeshNames: [],
+    warningObstacleIds: [],
+    collidingObstacleIds: [],
+  },
   setCollision: (collision) => set({ collision }),
 }));
 

@@ -1,5 +1,5 @@
 import { TransformControls } from '@react-three/drei';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { Object3D } from 'three';
 import { Euler } from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
@@ -19,8 +19,18 @@ export const ObstacleGizmo = (props: {
   const object = selectedId ? (props.obstacleObjectById.get(selectedId) ?? null) : null;
 
   const controlsRef = useRef<TransformControlsImpl | null>(null);
+  const onDraggingChangeRef = useRef(props.onDraggingChange);
 
   useEffect(() => {
+    onDraggingChangeRef.current = props.onDraggingChange;
+  }, [props.onDraggingChange]);
+
+  // Unmount safety only (do not run on re-render cleanups).
+  useEffect(() => {
+    return () => setTransformInteracting(false);
+  }, [setTransformInteracting]);
+
+  useLayoutEffect(() => {
     if (!controlsRef.current || !object || !selectedId) return;
     const controls = controlsRef.current;
     const controlsAny = controls as unknown as {
@@ -54,15 +64,15 @@ export const ObstacleGizmo = (props: {
     const onDraggingChanged = (e: unknown) => {
       const v = (e as { value?: unknown } | null)?.value;
       const active = Boolean(v);
-      props.onDraggingChange?.(active);
+      onDraggingChangeRef.current?.(active);
       setTransformInteracting(active);
     };
     const onMouseDown = () => {
-      props.onDraggingChange?.(true);
+      onDraggingChangeRef.current?.(true);
       setTransformInteracting(true);
     };
     const onMouseUp = () => {
-      props.onDraggingChange?.(false);
+      onDraggingChangeRef.current?.(false);
       setTransformInteracting(false);
     };
     controlsAny.addEventListener('objectChange', onObjectChange);
@@ -75,10 +85,28 @@ export const ObstacleGizmo = (props: {
       controlsAny.removeEventListener('mouseDown', onMouseDown);
       controlsAny.removeEventListener('mouseUp', onMouseUp);
     };
-  }, [object, props, selectedId, setTransformInteracting, updateObstaclePose]);
+  }, [object, selectedId, setTransformInteracting, updateObstaclePose]);
 
   if (!object) return null;
   return (
-    <TransformControls ref={controlsRef} object={object} mode="translate" space="world" size={1} />
+    <TransformControls
+      ref={controlsRef}
+      object={object}
+      mode="translate"
+      space="world"
+      size={1}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        setTransformInteracting(true);
+      }}
+      onPointerUp={(e) => {
+        e.stopPropagation();
+        setTransformInteracting(false);
+      }}
+      onPointerCancel={(e) => {
+        e.stopPropagation();
+        setTransformInteracting(false);
+      }}
+    />
   );
 };

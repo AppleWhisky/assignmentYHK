@@ -35,6 +35,16 @@ export const JointGizmo = (props: {
   const controlsRef = useRef<TransformControlsImpl | null>(null);
   const startQuatRef = useRef<Quaternion | null>(null);
   const startAngleRef = useRef<number>(0);
+  const onDraggingChangeRef = useRef(props.onDraggingChange);
+
+  useEffect(() => {
+    onDraggingChangeRef.current = props.onDraggingChange;
+  }, [props.onDraggingChange]);
+
+  // Unmount safety only (do not run on re-render cleanups).
+  useEffect(() => {
+    return () => setTransformInteracting(false);
+  }, [setTransformInteracting]);
 
   useEffect(() => {
     if (!controlsRef.current || !object || !joint) return;
@@ -64,6 +74,7 @@ export const JointGizmo = (props: {
     const onMouseDown = () => {
       startQuatRef.current = object.quaternion.clone();
       startAngleRef.current = joint.angleRad;
+      setTransformInteracting(true);
     };
     const onObjectChange = () => {
       if (!startQuatRef.current) return;
@@ -83,11 +94,11 @@ export const JointGizmo = (props: {
     const onDraggingChanged = (e: unknown) => {
       const v = (e as { value?: unknown } | null)?.value;
       const active = Boolean(v);
-      props.onDraggingChange?.(active);
+      onDraggingChangeRef.current?.(active);
       setTransformInteracting(active);
     };
     const onMouseUp = () => {
-      props.onDraggingChange?.(false);
+      onDraggingChangeRef.current?.(false);
       setTransformInteracting(false);
     };
 
@@ -101,7 +112,7 @@ export const JointGizmo = (props: {
       controlsAny.removeEventListener('objectChange', onObjectChange);
       controlsAny.removeEventListener('dragging-changed', onDraggingChanged);
     };
-  }, [object, joint, props, setJointAngle, setTransformInteracting]);
+  }, [object, joint, setJointAngle, setTransformInteracting]);
 
   if (!object || !joint) return null;
 
