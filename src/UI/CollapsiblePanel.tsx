@@ -5,9 +5,11 @@ export const CollapsiblePanel = (props: {
   title: string;
   children: ReactNode;
   dockSide?: 'left' | 'right';
+  tone?: 'none' | 'warning' | 'collision';
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const dockSide = props.dockSide ?? 'right';
+  const tone = props.tone ?? 'none';
 
   const arrow =
     dockSide === 'right'
@@ -37,7 +39,15 @@ export const CollapsiblePanel = (props: {
       >
         {arrow}
       </button>
-      <div className="panelFrame">
+      <div
+        className={[
+          'panelFrame',
+          tone === 'warning' ? 'isWarning' : null,
+          tone === 'collision' ? 'isCollision' : null,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <div className="panelHeader">
           <div className="panelTitle">{props.title}</div>
         </div>

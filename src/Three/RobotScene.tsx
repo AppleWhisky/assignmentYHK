@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { Object3D } from 'three';
 import { Box3, Color, Vector3 } from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useSimStore } from '@/store/useSimStore';
 import { RobotLoader, type RobotRuntime } from '@/Three/Robot/RobotLoader';
 import { buildArm01Rig } from '@/Three/Robot/Arm01Rig';
@@ -56,7 +57,18 @@ const _pivotCenter = new Vector3();
 const SceneContents = () => {
   const { camera, gl } = useThree();
   const setThree = useSimStore((s) => s.setThree);
+  const setOrbitControls = useSimStore((s) => s.setOrbitControls);
   useEffect(() => setThree({ camera, gl }), [camera, gl, setThree]);
+  const orbitRef = useRef<OrbitControlsImpl | null>(null);
+  const didSaveOrbitRef = useRef(false);
+  useEffect(() => {
+    const o = orbitRef.current;
+    setOrbitControls(o);
+    if (!o) return;
+    if (didSaveOrbitRef.current) return;
+    didSaveOrbitRef.current = true;
+    o.saveState();
+  }, [setOrbitControls]);
 
   const joints = useSimStore((s) => s.joints);
   const axisOverrides = useSimStore((s) => s.jointAxisOverrides);
@@ -188,7 +200,7 @@ const SceneContents = () => {
         />
       </mesh>
 
-      <OrbitControls makeDefault enabled={!transformInteracting} />
+      <OrbitControls ref={orbitRef} makeDefault enabled={!transformInteracting} />
 
       {/* Outer group: robot translation (XZ). Rotation is applied around a Base pivot below. */}
       <group

@@ -1,5 +1,4 @@
 import { useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
 import type { Mesh } from 'three';
 import { BoxGeometry, Color, MeshStandardMaterial } from 'three';
 import type { ObstacleState } from '@/store/useSimStore';
@@ -12,28 +11,32 @@ export const ObstacleMesh = (props: {
   const ref = useRef<Mesh | null>(null);
   const selected = useSimStore((s) => s.selected);
   const setSelected = useSimStore((s) => s.setSelected);
+  const collision = useSimStore((s) => s.collision);
 
   const isSelected = selected?.kind === 'obstacle' && selected.id === props.obstacle.id;
+  const isColliding = collision.collidingObstacleIds.includes(props.obstacle.id);
+  const isWarning = !isColliding && collision.warningObstacleIds.includes(props.obstacle.id);
+
+  const fillHex = isColliding ? '#ef4444' : isWarning ? '#f59e0b' : isSelected ? '#3b82f6' : '#e2e8f0';
+
   const material = useMemo(() => {
-    const c = new Color(isSelected ? '#77a7ff' : '#ffffff');
+    const c = new Color(fillHex);
     const m = new MeshStandardMaterial({
       color: c,
-      transparent: true,
-      opacity: 0.35,
-      roughness: 0.35,
-      metalness: 0.05,
+      transparent: false,
+      opacity: 1,
+      roughness: 0.55,
+      metalness: 0.02,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
     });
-    m.emissive = c;
-    m.emissiveIntensity = isSelected ? 0.12 : 0.05;
+    m.emissive = c.clone();
+    m.emissiveIntensity = isColliding ? 0.25 : isWarning ? 0.18 : 0.08;
     return m;
-  }, [isSelected]);
+  }, [fillHex, isColliding, isWarning]);
 
   const geometry = useMemo(() => new BoxGeometry(1, 1, 1), []);
-
-  useFrame(() => {
-    if (!ref.current) return;
-    props.registerObject(props.obstacle.id, ref.current);
-  });
 
   return (
     <mesh
@@ -56,6 +59,7 @@ export const ObstacleMesh = (props: {
         setSelected({ kind: 'obstacle', id: props.obstacle.id });
       }}
       userData={{ kind: 'obstacle', id: props.obstacle.id }}
+      renderOrder={5}
     />
   );
 };

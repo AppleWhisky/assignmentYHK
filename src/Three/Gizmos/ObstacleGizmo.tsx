@@ -12,6 +12,9 @@ export const ObstacleGizmo = (props: {
   onDraggingChange?: (dragging: boolean) => void;
 }) => {
   const selected = useSimStore((s) => s.selected);
+  // When obstacles mount/unmount, their Three.js objects register into a Map.
+  // This version bump forces a rerender so the gizmo can attach immediately.
+  useSimStore((s) => s.obstacleRegistryVersion);
   const updateObstaclePose = useSimStore((s) => s.updateObstaclePose);
   const setTransformInteracting = useSimStore((s) => s.setTransformInteracting);
 
@@ -94,6 +97,9 @@ export const ObstacleGizmo = (props: {
       object={object}
       mode="translate"
       space="world"
+      showX
+      showY
+      showZ
       size={1}
       onPointerDown={(e) => {
         e.stopPropagation();

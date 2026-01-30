@@ -21,7 +21,7 @@ const HoldButton = (props: { label: string; onStep: () => void; children: ReactN
   return (
     <button
       type="button"
-      style={{ padding: '8px 10px' }}
+      className="nudgeBtn"
       aria-label={props.label}
       onPointerDown={(e) => {
         e.stopPropagation();
@@ -54,241 +54,197 @@ export const JogPanel = () => {
   const robotYawRad = useSimStore((s) => s.robotYawRad);
   const setRobotYawRad = useSimStore((s) => s.setRobotYawRad);
   const nudgeRobotYaw = useSimStore((s) => s.nudgeRobotYaw);
-  const collision = useSimStore((s) => s.collision);
-  const showCollisionBoxes = useSimStore((s) => s.showCollisionBoxes);
-  const setShowCollisionBoxes = useSimStore((s) => s.setShowCollisionBoxes);
 
   return (
-    <div>
-      <div className="badge" style={{ marginTop: 0 }}>
-        <span className={collision.severity === 'collision' ? 'dot isColliding' : 'dot'} />
-        <span>
-          {collision.severity === 'collision'
-            ? 'Collision'
-            : collision.severity === 'warning'
-              ? 'Warning'
-              : 'OK'}
-        </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Status is shown in the TopBar HUD; keep this panel focused on controls. */}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <button onClick={() => setSelected({ kind: 'robot' })} style={{ fontSize: 11 }}>
+          Move robot
+        </button>
+        <button onClick={() => resetRobotPose()} style={{ fontSize: 11 }}>
+          Reset pose
+        </button>
       </div>
 
-      <label
-        style={{
-          marginTop: 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          fontSize: 12,
-          color: 'var(--muted)',
-          userSelect: 'none',
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={showCollisionBoxes}
-          onChange={(e) => setShowCollisionBoxes(e.target.checked)}
-        />
-        Show collision bounding boxes
-      </label>
-
-      <div className="btnRow" style={{ marginTop: 10 }}>
-        <button onClick={() => setSelected({ kind: 'robot' })}>Move robot</button>
-        <button onClick={() => resetRobotPose()}>Reset robot</button>
-      </div>
-
-      <h2 style={{ marginTop: 12 }}>Robot Base</h2>
-      <div style={{ marginTop: 10 }}>
+      <section>
+        <h2>Robot Base</h2>
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 34px 34px 64px',
-            gap: 8,
-            alignItems: 'center',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid var(--panel-border)',
+            padding: 10,
+            borderRadius: 12,
           }}
         >
-          <button
-            type="button"
-            style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'baseline',
-              cursor: 'pointer',
-              width: '100%',
-              textAlign: 'left',
-              padding: '8px 10px',
-              fontSize: 12,
-              lineHeight: 1.1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-            }}
-            onClick={() => {
-              setJointGizmoActive(false);
-              setSelected({ kind: 'robot' });
-            }}
-          >
-            <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Base Rotation
-            </span>
-            <span style={{ color: 'var(--muted)' }}>(Y)</span>
-          </button>
-          <HoldButton
-            label="Nudge Base Rotation -"
-            onStep={() => {
-              setJointGizmoActive(false);
-              setSelected({ kind: 'robot' });
-              nudgeRobotYaw(-1);
-            }}
-          >
-            -
-          </HoldButton>
-          <HoldButton
-            label="Nudge Base Rotation +"
-            onStep={() => {
-              setJointGizmoActive(false);
-              setSelected({ kind: 'robot' });
-              nudgeRobotYaw(1);
-            }}
-          >
-            +
-          </HoldButton>
-          <output
-            style={{
-              justifySelf: 'end',
-              textAlign: 'right',
-              fontVariantNumeric: 'tabular-nums',
-              minWidth: 64,
-            }}
-          >
-            {radToDeg(robotYawRad).toFixed(1)}°
-          </output>
-        </div>
-        <input
-          className="slider"
-          type="range"
-          min={-180}
-          max={180}
-          step={0.5}
-          list="zero-tick-base-yaw"
-          value={clamp(radToDeg(robotYawRad), -180, 180)}
-          onChange={(e) => {
-            setJointGizmoActive(false);
-            setSelected({ kind: 'robot' });
-            setRobotYawRad(degToRad(Number(e.target.value)));
-          }}
-        />
-        <datalist id="zero-tick-base-yaw">
-          {SNAP_DEGS.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
-      </div>
-
-      {joints.length === 0 ? (
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
-          Loading joints from GLB...
-        </div>
-      ) : null}
-
-      <h2 style={{ marginTop: 12 }}>Joints</h2>
-      {joints.map((j) => {
-        const isSelected = selected?.kind === 'joint' && selected.name === j.name;
-        const deg = radToDeg(j.angleRad);
-        const minDeg = typeof j.minRad === 'number' ? radToDeg(j.minRad) : -180;
-        const maxDeg = typeof j.maxRad === 'number' ? radToDeg(j.maxRad) : 180;
-        return (
-          <div key={j.name} style={{ marginTop: 10 }}>
-            <div
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <button
+              type="button"
               style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 34px 34px 64px',
-                gap: 8,
-                alignItems: 'center',
+                padding: 0,
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text)',
+                textAlign: 'left',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                setJointGizmoActive(false);
+                setSelected({ kind: 'robot' });
               }}
             >
-              <button
-                type="button"
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  alignItems: 'baseline',
-                  cursor: 'pointer',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '8px 10px',
-                  fontSize: 12,
-                  lineHeight: 1.1,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                }}
-                onClick={() => {
-                  setSelected({ kind: 'joint', name: j.name });
-                  setJointGizmoActive(true);
-                }}
-              >
-                <span
-                  style={{
-                    color: isSelected ? 'rgba(45,108,255,1)' : undefined,
-                    fontWeight: 700,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {j.label}
-                </span>
-                <span style={{ color: 'var(--muted)' }}>({j.axis.toUpperCase()})</span>
-              </button>
-              <HoldButton
-                label={`Nudge ${j.label} -`}
-                onStep={() => {
-                  setSelected({ kind: 'joint', name: j.name });
-                  setJointGizmoActive(true);
-                  nudgeJoint(j.name, -1);
-                }}
-              >
-                -
-              </HoldButton>
-              <HoldButton
-                label={`Nudge ${j.label} +`}
-                onStep={() => {
-                  setSelected({ kind: 'joint', name: j.name });
-                  setJointGizmoActive(true);
-                  nudgeJoint(j.name, 1);
-                }}
-              >
-                +
-              </HoldButton>
-              <output
-                style={{
-                  justifySelf: 'end',
-                  textAlign: 'right',
-                  fontVariantNumeric: 'tabular-nums',
-                  minWidth: 64,
-                }}
-              >
-                {deg.toFixed(1)}°
-              </output>
-            </div>
+              Base Yaw <span style={{ color: 'var(--muted)' }}>(Y)</span>
+            </button>
+            <span style={{ fontFamily: 'ui-monospace, monospace', color: '#60a5fa', fontSize: 12 }}>
+              {radToDeg(robotYawRad).toFixed(1)}°
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+            <HoldButton
+              label="Nudge Base Yaw -"
+              onStep={() => {
+                setJointGizmoActive(false);
+                setSelected({ kind: 'robot' });
+                nudgeRobotYaw(-1);
+              }}
+            >
+              -
+            </HoldButton>
             <input
               className="slider"
               type="range"
-              min={minDeg}
-              max={maxDeg}
+              min={-180}
+              max={180}
               step={0.5}
-              list={`zero-tick-${j.name}`}
-              value={clamp(deg, minDeg, maxDeg)}
+              list="zero-tick-base-yaw"
+              value={clamp(radToDeg(robotYawRad), -180, 180)}
               onChange={(e) => {
-                setSelected({ kind: 'joint', name: j.name });
-                setJointGizmoActive(true);
-                setJointAngle(j.name, degToRad(Number(e.target.value)));
+                setJointGizmoActive(false);
+                setSelected({ kind: 'robot' });
+                setRobotYawRad(degToRad(Number(e.target.value)));
               }}
+              style={{ flex: 1, margin: 0 }}
             />
-            <datalist id={`zero-tick-${j.name}`}>
-              {SNAP_DEGS.filter((v) => v >= minDeg && v <= maxDeg).map((v) => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
+            <HoldButton
+              label="Nudge Base Yaw +"
+              onStep={() => {
+                setJointGizmoActive(false);
+                setSelected({ kind: 'robot' });
+                nudgeRobotYaw(1);
+              }}
+            >
+              +
+            </HoldButton>
           </div>
-        );
-      })}
+          <datalist id="zero-tick-base-yaw">
+            {SNAP_DEGS.map((v) => (
+              <option key={v} value={v} />
+            ))}
+          </datalist>
+        </div>
+      </section>
+
+      <section>
+        <h2>Joints</h2>
+        {joints.length === 0 ? (
+          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Loading joints from GLB...</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {joints.map((j) => {
+              const isSelected = selected?.kind === 'joint' && selected.name === j.name;
+              const deg = radToDeg(j.angleRad);
+              const minDeg = typeof j.minRad === 'number' ? radToDeg(j.minRad) : -180;
+              const maxDeg = typeof j.maxRad === 'number' ? radToDeg(j.maxRad) : 180;
+              const clampedDeg = clamp(deg, minDeg, maxDeg);
+
+              return (
+                <div
+                  key={j.name}
+                  style={{
+                    background: isSelected ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${isSelected ? 'rgba(59, 130, 246, 0.45)' : 'var(--panel-border)'}`,
+                    padding: 10,
+                    borderRadius: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                    <button
+                      type="button"
+                      style={{
+                        padding: 0,
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text)',
+                        textAlign: 'left',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        setSelected({ kind: 'joint', name: j.name });
+                        setJointGizmoActive(true);
+                      }}
+                    >
+                      {j.label} <span style={{ color: 'var(--muted)' }}>({j.axis.toUpperCase()})</span>
+                    </button>
+                    <span style={{ fontFamily: 'ui-monospace, monospace', color: '#60a5fa', fontSize: 12 }}>
+                      {clampedDeg.toFixed(1)}°
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                    <HoldButton
+                      label={`Nudge ${j.label} -`}
+                      onStep={() => {
+                        setSelected({ kind: 'joint', name: j.name });
+                        setJointGizmoActive(true);
+                        nudgeJoint(j.name, -1);
+                      }}
+                    >
+                      -
+                    </HoldButton>
+                    <input
+                      className="slider"
+                      type="range"
+                      min={minDeg}
+                      max={maxDeg}
+                      step={0.5}
+                      list={`zero-tick-${j.name}`}
+                      value={clampedDeg}
+                      onChange={(e) => {
+                        setSelected({ kind: 'joint', name: j.name });
+                        setJointGizmoActive(true);
+                        setJointAngle(j.name, degToRad(Number(e.target.value)));
+                      }}
+                      style={{ flex: 1, margin: 0 }}
+                    />
+                    <HoldButton
+                      label={`Nudge ${j.label} +`}
+                      onStep={() => {
+                        setSelected({ kind: 'joint', name: j.name });
+                        setJointGizmoActive(true);
+                        nudgeJoint(j.name, 1);
+                      }}
+                    >
+                      +
+                    </HoldButton>
+                  </div>
+
+                  <datalist id={`zero-tick-${j.name}`}>
+                    {SNAP_DEGS.filter((v) => v >= minDeg && v <= maxDeg).map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

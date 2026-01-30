@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { WebGLRenderer } from 'three';
 import type { Camera } from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 export type Axis = 'x' | 'y' | 'z';
 
@@ -44,6 +45,10 @@ export type SimState = {
   camera: Camera | null;
   gl: WebGLRenderer | null;
   setThree: (v: { camera: Camera; gl: WebGLRenderer }) => void;
+  orbitControls: OrbitControlsImpl | null;
+  setOrbitControls: (c: OrbitControlsImpl | null) => void;
+  resetCamera: () => void;
+  resetScene: () => void;
 
   // Debug / dev flags
   showCollisionBoxes: boolean;
@@ -79,6 +84,8 @@ export type SimState = {
     pose: Partial<Pick<ObstacleState, 'position' | 'rotation'>>,
   ) => void;
   updateObstacleSize: (id: string, size: ObstacleState['size']) => void;
+  obstacleRegistryVersion: number;
+  bumpObstacleRegistryVersion: () => void;
 
   // Selection
   selected: Selected;
@@ -103,10 +110,88 @@ function makeId() {
   return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
 }
 
+function randBetween(a: number, b: number) {
+  return a + Math.random() * (b - a);
+}
+
+function halfXZ(size: [number, number, number]) {
+  return Math.max(size[0], size[2]) * 0.5;
+}
+
+function isSpawnSafeXZ(
+  x: number,
+  z: number,
+  size: [number, number, number],
+  robotPosition: [number, number, number],
+  obstacles: ObstacleState[],
+) {
+  // Very simple safety: avoid robot footprint and existing obstacle footprints (circle approximation in XZ).
+  const myR = halfXZ(size);
+  const robotAvoidR = 0.95; // heuristic world-space radius around robot base
+  const dxr = x - robotPosition[0];
+  const dzr = z - robotPosition[2];
+  if (dxr * dxr + dzr * dzr < (robotAvoidR + myR) * (robotAvoidR + myR)) return false;
+
+  for (const o of obstacles) {
+    const r = halfXZ(o.size);
+    const dx = x - o.position[0];
+    const dz = z - o.position[2];
+    const minR = r + myR + 0.08; // small gap
+    if (dx * dx + dz * dz < minR * minR) return false;
+  }
+
+  return true;
+}
+
+function chooseSpawnXZ(
+  size: [number, number, number],
+  robotPosition: [number, number, number],
+  obstacles: ObstacleState[],
+): [number, number] {
+  // Sample a ring around the robot and pick the first safe point.
+  const baseR = 1.2 + obstacles.length * 0.1;
+  for (let i = 0; i < 32; i++) {
+    const a = randBetween(0, Math.PI * 2);
+    const r = baseR + randBetween(0, 0.6);
+    const x = robotPosition[0] + Math.cos(a) * r;
+    const z = robotPosition[2] + Math.sin(a) * r;
+    if (isSpawnSafeXZ(x, z, size, robotPosition, obstacles)) return [x, z];
+  }
+  // Fallback: still offset from robot, even if it overlaps another obstacle.
+  return [robotPosition[0] + baseR, robotPosition[2]];
+}
+
 export const useSimStore = create<SimState>((set, get) => ({
   camera: null,
   gl: null,
   setThree: ({ camera, gl }) => set({ camera, gl }),
+  orbitControls: null,
+  setOrbitControls: (orbitControls) => set({ orbitControls }),
+  resetCamera: () => {
+    const oc = get().orbitControls;
+    if (oc) {
+      oc.reset();
+    }
+  },
+  resetScene: () => {
+    // Full reset: robot pose + obstacles + selection + collision + debug flags (+ camera if available)
+    get().resetRobotPose();
+    set({
+      obstacles: [],
+      collision: {
+        severity: 'none',
+        warningMeshNames: [],
+        collidingMeshNames: [],
+        warningObstacleIds: [],
+        collidingObstacleIds: [],
+      },
+      showCollisionBoxes: false,
+      selected: null,
+      jointGizmoActive: false,
+      transformInteracting: false,
+    });
+    get().resetCamera();
+  },
 
   showCollisionBoxes: false,
   setShowCollisionBoxes: (show) => set({ showCollisionBoxes: show }),
@@ -157,12 +242,16 @@ export const useSimStore = create<SimState>((set, get) => ({
     })),
 
   obstacles: [],
+  obstacleRegistryVersion: 0,
+  bumpObstacleRegistryVersion: () => set((s) => ({ obstacleRegistryVersion: s.obstacleRegistryVersion + 1 })),
   addObstacle: () =>
     set((s) => {
       const id = makeId();
       const idx = s.obstacles.length + 1;
-      const basePos: [number, number, number] = [0.6, 0.2, 0.2];
-      const size: [number, number, number] = [0.2, 0.2, 0.2];
+      const size: [number, number, number] = [0.55, 0.55, 0.55];
+      const [x, z] = chooseSpawnXZ(size, s.robotPosition, s.obstacles);
+      const y = size[1] * 0.5; // sit on the floor
+      const basePos: [number, number, number] = [x, y, z];
       return {
         obstacles: [
           ...s.obstacles,

@@ -3,6 +3,37 @@ import { useSimStore } from '@/store/useSimStore';
 
 const clampNumber = (n: number) => (Number.isFinite(n) ? n : 0);
 
+type AxisKey = 'X' | 'Y' | 'Z';
+const AXIS_BADGE_BG: Record<AxisKey, string> = {
+  X: 'var(--axis-x)',
+  Y: 'var(--axis-y)',
+  Z: 'var(--axis-z)',
+};
+
+const AxisBadge = (props: { axis: AxisKey }) => {
+  const bg = AXIS_BADGE_BG[props.axis];
+  return (
+    <div
+      style={{
+        background: bg,
+        color: '#0b1020',
+        fontSize: 9,
+        fontWeight: 900,
+        padding: '1px 4px',
+        borderRadius: 4,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 16,
+        height: 16,
+        flex: '0 0 auto',
+      }}
+    >
+      {props.axis}
+    </div>
+  );
+};
+
 const Vec3Row = (props: {
   label: string;
   value: [number, number, number];
@@ -12,29 +43,107 @@ const Vec3Row = (props: {
   const step = props.step ?? 0.01;
   const [x, y, z] = props.value;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 1fr', gap: 6, alignItems: 'center' }}>
-      <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{props.label}</div>
-      <input
-        type="number"
-        value={x}
-        step={step}
-        onChange={(e) => props.onChange([clampNumber(Number(e.target.value)), y, z])}
-        style={{ width: '100%' }}
-      />
-      <input
-        type="number"
-        value={y}
-        step={step}
-        onChange={(e) => props.onChange([x, clampNumber(Number(e.target.value)), z])}
-        style={{ width: '100%' }}
-      />
-      <input
-        type="number"
-        value={z}
-        step={step}
-        onChange={(e) => props.onChange([x, y, clampNumber(Number(e.target.value))])}
-        style={{ width: '100%' }}
-      />
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '44px 1fr 1fr 1fr',
+        gap: 8,
+        alignItems: 'center',
+        marginBottom: 4,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: 'var(--muted)',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {props.label}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(0,0,0,0.22)',
+          padding: '4px 6px',
+          borderRadius: 10,
+          border: '1px solid var(--panel-border)',
+        }}
+      >
+        <AxisBadge axis="X" />
+        <input
+          type="number"
+          value={Number.isFinite(x) ? Number(x.toFixed(3)) : 0}
+          step={step}
+          onChange={(e) => props.onChange([clampNumber(Number(e.target.value)), y, z])}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            textAlign: 'right',
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(0,0,0,0.22)',
+          padding: '4px 6px',
+          borderRadius: 10,
+          border: '1px solid var(--panel-border)',
+        }}
+      >
+        <AxisBadge axis="Y" />
+        <input
+          type="number"
+          value={Number.isFinite(y) ? Number(y.toFixed(3)) : 0}
+          step={step}
+          onChange={(e) => props.onChange([x, clampNumber(Number(e.target.value)), z])}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            textAlign: 'right',
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(0,0,0,0.22)',
+          padding: '4px 6px',
+          borderRadius: 10,
+          border: '1px solid var(--panel-border)',
+        }}
+      >
+        <AxisBadge axis="Z" />
+        <input
+          type="number"
+          value={Number.isFinite(z) ? Number(z.toFixed(3)) : 0}
+          step={step}
+          onChange={(e) => props.onChange([x, y, clampNumber(Number(e.target.value))])}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            textAlign: 'right',
+          }}
+        />
+      </div>
     </div>
   );
 };
