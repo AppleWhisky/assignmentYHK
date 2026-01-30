@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+
+public
+src/assets
+
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.glb
+*.gltf
+
