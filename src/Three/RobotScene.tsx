@@ -16,6 +16,7 @@ import { ObstacleGizmo } from '@/Three/Gizmos/ObstacleGizmo';
 import { CollisionSystem } from '@/Three/Collision/CollisionSystem';
 import { CollisionDebugBoxes } from '@/Three/Collision/CollisionDebugBoxes';
 import { Light } from '@/Three/Light';
+import { AnimationPlayer } from '@/Three/Animation/AnimationPlayer';
 
 const NO_RAYCAST = () => {
   // Intentionally empty: disables hit-testing for this object
@@ -180,6 +181,7 @@ const SceneContents = () => {
   return (
     <>
       <Light />
+      <AnimationPlayer />
 
       {/* Avoid z-fighting: keep plane slightly below grid */}
       <gridHelper args={[60, 120]} position={[0, 0.001, 0]} />

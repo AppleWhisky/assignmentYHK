@@ -6,9 +6,15 @@ import { BottomBar } from '@/UI/BottomBar';
 import { OverlayLayout } from '@/UI/layout/OverlayLayout';
 import { CollapsiblePanel } from '@/UI/CollapsiblePanel';
 import { useSimStore } from '@/store/useSimStore';
+import { AnimationEditorOverlay } from '@/UI/AnimationEditor/AnimationEditorOverlay';
+import { useEffect } from 'react';
 
 const App = () => {
   const severity = useSimStore((s) => s.collision.severity);
+  const loadPresetAnimations = useSimStore((s) => s.loadPresetAnimations);
+  useEffect(() => {
+    void loadPresetAnimations();
+  }, [loadPresetAnimations]);
   return (
     <div className="app">
       <div className="appHeader">
@@ -29,6 +35,7 @@ const App = () => {
           }
           bottom={<BottomBar />}
         />
+        <AnimationEditorOverlay />
       </div>
     </div>
   );

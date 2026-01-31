@@ -10,6 +10,8 @@ export const TopBar = () => {
   const resetRobotPose = useSimStore((s) => s.resetRobotPose);
   const resetCamera = useSimStore((s) => s.resetCamera);
   const resetScene = useSimStore((s) => s.resetScene);
+  const animationEditorOpen = useSimStore((s) => s.animationEditorOpen);
+  const setAnimationEditorOpen = useSimStore((s) => s.setAnimationEditorOpen);
 
   const statusColor =
     collision.severity === 'collision'
@@ -77,6 +79,14 @@ export const TopBar = () => {
       </div>
 
       <div className="topHudSection topHudRight">
+        <button
+          className="topHudBtn"
+          onClick={() => setAnimationEditorOpen(!animationEditorOpen)}
+          style={{ borderColor: animationEditorOpen ? 'rgba(59, 130, 246, 0.45)' : undefined }}
+        >
+          Animator
+        </button>
+
         <label className="topHudToggle">
           <input
             type="checkbox"

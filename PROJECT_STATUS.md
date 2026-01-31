@@ -1,5 +1,13 @@
 # Project Status — Robot Arm Simulator (R3F)
 
+## Notice (v2 doc available)
+
+This file is kept for historical notes, but the up-to-date project status is now in:
+
+- `PROJECT_STATUS_v2.md`
+
+---
+
 This document summarizes the **current state** of the project: what’s implemented, where it lives, how to use it, and what the most valuable next steps are.
 
 ## What this project is

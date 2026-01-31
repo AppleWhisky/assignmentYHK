@@ -1,6 +1,6 @@
 import { radToDeg, degToRad, clamp } from '@/utils/angles';
 import { useSimStore } from '@/store/useSimStore';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 const SNAP_DEGS = [-180, -135, -90, -45, 0, 45, 90, 135, 180] as const;
@@ -54,10 +54,112 @@ export const JogPanel = () => {
   const robotYawRad = useSimStore((s) => s.robotYawRad);
   const setRobotYawRad = useSimStore((s) => s.setRobotYawRad);
   const nudgeRobotYaw = useSimStore((s) => s.nudgeRobotYaw);
+  const savedAnimations = useSimStore((s) => s.savedAnimations);
+  const selectedAnimationId = useSimStore((s) => s.selectedAnimationId);
+  const selectAnimation = useSimStore((s) => s.selectAnimation);
+  const presetAnimationsLoading = useSimStore((s) => s.presetAnimationsLoading);
+  const presetAnimationsError = useSimStore((s) => s.presetAnimationsError);
+  const loadPresetAnimations = useSimStore((s) => s.loadPresetAnimations);
+  const playback = useSimStore((s) => s.playback);
+  const startPlayback = useSimStore((s) => s.startPlayback);
+  const stopPlayback = useSimStore((s) => s.stopPlayback);
+  const [simError, setSimError] = useState<string | null>(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Status is shown in the TopBar HUD; keep this panel focused on controls. */}
+
+      <section>
+        <h2>Simulation</h2>
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid var(--panel-border)',
+            padding: 10,
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+            <select
+              className="animSelect"
+              value={selectedAnimationId ?? ''}
+              onChange={(e) => selectAnimation(e.target.value || null)}
+              disabled={!savedAnimations.length}
+              title={!savedAnimations.length ? 'Add files to public/animations and update public/animations/index.json' : undefined}
+            >
+              <option value="">
+                {presetAnimationsLoading
+                  ? '(loading animations...)'
+                  : savedAnimations.length
+                    ? '(select animation)'
+                    : '(no animations found)'}
+              </option>
+              {savedAnimations
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} {a.loopMode === 'pingpong' ? '↔' : ''}
+                  </option>
+                ))}
+            </select>
+
+            {playback.status === 'playing' ? (
+              <button
+                onClick={() => stopPlayback()}
+                style={{ fontSize: 11, borderColor: 'rgba(239, 68, 68, 0.45)' }}
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (!selectedAnimationId) return;
+                  const r = startPlayback(selectedAnimationId);
+                  if (!r.ok) setSimError(r.error);
+                  else setSimError(null);
+                }}
+                style={{ fontSize: 11 }}
+                disabled={!selectedAnimationId}
+                title={!selectedAnimationId ? 'Select a saved animation first' : undefined}
+              >
+                Simulation Start
+              </button>
+            )}
+          </div>
+
+          {simError ? (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#ff9a3d' }}>Cannot play: {simError}</div>
+          ) : null}
+          {presetAnimationsError ? (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#ff9a3d' }}>
+              Failed to load presets: {presetAnimationsError}{' '}
+              <button
+                className="topHudBtn"
+                style={{ marginLeft: 8, padding: '4px 8px', fontSize: 11 }}
+                onClick={() => void loadPresetAnimations()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)' }}>
+            {selectedAnimationId
+              ? (() => {
+                  const a = savedAnimations.find((x) => x.id === selectedAnimationId);
+                  if (!a) return 'Selected animation not found.';
+                  let maxLayer = 0;
+                  for (const n of a.nodes) {
+                    const l = Math.floor(n.data.layer);
+                    if (Number.isFinite(l) && l > 0) maxLayer = Math.max(maxLayer, l);
+                  }
+                  return `Loop: ${a.loopMode === 'pingpong' ? 'Ping-pong' : 'None'} · Layer duration: 1.0s · Total: ${maxLayer}s`;
+                })()
+              : 'Tip: Put animations in public/animations + update public/animations/index.json.'}
+          </div>
+        </div>
+      </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <button onClick={() => setSelected({ kind: 'robot' })} style={{ fontSize: 11 }}>
