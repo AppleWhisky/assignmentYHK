@@ -4,7 +4,7 @@
 
 This file is kept for historical notes, but the up-to-date project status is now in:
 
-- `PROJECT_STATUS_v2.md`
+- `PROJECT_STATUS_v3.md`
 
 ---
 
