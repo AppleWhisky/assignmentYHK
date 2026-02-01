@@ -22,7 +22,7 @@
 
 ### 기술 스택
 - **React + TypeScript**
-- **React Three Fiber(R3F) + Drei**: 3D 씬 구성, 컨트롤, HDRI 환경광
+- **React Three Fiber(R3F) + Drei**: 3D 씬 구성, 컨트롤
 - **Zustand**: 상태 관리(로봇 pose / 장애물 / 충돌 / 애니메이션 / 시뮬레이션)
 - **ReactFlow**: 애니메이션 제작(Animator) 오버레이
 
