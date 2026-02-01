@@ -115,7 +115,14 @@ export const createObstaclesSlice: StateCreator<SimState, [], [], ObstaclesSlice
 
   updateObstacleSize: (id, size) =>
     set((s) => ({
-      obstacles: s.obstacles.map((o) => (o.id === id ? { ...o, size } : o)),
+      obstacles: s.obstacles.map((o) =>
+        o.id === id
+          ? {
+              ...o,
+              size: [Math.max(0, size[0]), Math.max(0, size[1]), Math.max(0, size[2])],
+            }
+          : o,
+      ),
     })),
 });
 

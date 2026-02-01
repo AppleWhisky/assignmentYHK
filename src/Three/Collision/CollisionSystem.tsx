@@ -1,10 +1,9 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Material } from 'three';
-import { Box3, Color, Mesh } from 'three';
+import { Box3, Color, Mesh, Vector3 } from 'three';
 import type { Object3D } from 'three';
 import { useSimStore } from '@/store/useSimStore';
-import { boxDistance } from '@/utils/box';
 import type { ObstacleCollisionPair } from '@/store/useSimStore';
 
 type SavedMaterial = {
@@ -16,10 +15,10 @@ type SavedMaterial = {
 
 const WARN_COLOR = new Color('#ff9a3d');
 const COLLISION_COLOR = new Color('#ff4d5e');
+const WARNING_MARGIN = 0.03;
 
-const _boxA = new Box3();
-const _boxB = new Box3();
 const _tmp = new Box3();
+const _t = new Vector3();
 
 export const CollisionSystem = (props: {
   robotRoot: Object3D | null;
@@ -76,29 +75,32 @@ export const CollisionSystem = (props: {
     const warningPairs = new Set<string>();
     const collidingPairs = new Set<string>();
 
+    const obstacleInfo = obstacleEntries.map(([id, obj]) => {
+      obj.updateWorldMatrix(true, false);
+      const obb = getObjectWorldObb(obj);
+      return { id, obj, obb };
+    });
+
     for (const mesh of robotMeshes) {
-      if (!mesh.geometry) continue;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox?.();
-      if (!mesh.geometry.boundingBox) continue;
-      _boxA.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+      const meshObb = getMeshWorldObb(mesh);
+      if (!meshObb) continue;
 
-      for (const [id, obj] of obstacleEntries) {
-        // Robust AABB even if obstacle rotates/scales
-        _tmp.setFromObject(obj);
-        _boxB.copy(_tmp);
+      for (const info of obstacleInfo) {
+        if (!info.obb) continue;
 
-        if (_boxA.intersectsBox(_boxB)) {
+        const intersects = obbIntersectsObb(meshObb, info.obb);
+        if (intersects) {
           const meshKey = mesh.name || mesh.uuid;
           collidingMeshes.add(meshKey);
-          collidingObstacles.add(id);
-          collidingPairs.add(`${meshKey}::${id}`);
+          collidingObstacles.add(info.id);
+          collidingPairs.add(`${meshKey}::${info.id}`);
         } else {
-          const d = boxDistance(_boxA, _boxB);
-          if (d < 0.03) {
+          const warn = obbIntersectsObb(meshObb, expandObb(info.obb, WARNING_MARGIN));
+          if (warn) {
             const meshKey = mesh.name || mesh.uuid;
             warningMeshes.add(meshKey);
-            warningObstacles.add(id);
-            warningPairs.add(`${meshKey}::${id}`);
+            warningObstacles.add(info.id);
+            warningPairs.add(`${meshKey}::${info.id}`);
           }
         }
       }
@@ -132,6 +134,183 @@ export const CollisionSystem = (props: {
 
   return null;
 };
+
+type OBB = {
+  c: Vector3;
+  u0: Vector3;
+  u1: Vector3;
+  u2: Vector3;
+  half: [number, number, number];
+};
+
+function expandObb(obb: OBB, margin: number): OBB {
+  return {
+    c: obb.c,
+    u0: obb.u0,
+    u1: obb.u1,
+    u2: obb.u2,
+    half: [obb.half[0] + margin, obb.half[1] + margin, obb.half[2] + margin],
+  };
+}
+
+function getObjectWorldObb(obj: Object3D): OBB | null {
+  if (obj instanceof Mesh) return getMeshWorldObb(obj);
+  // Fallback: world-aligned OBB from AABB.
+  _tmp.setFromObject(obj);
+  if (_tmp.isEmpty()) return null;
+  _tmp.getCenter(_fallbackCenter);
+  _tmp.getSize(_fallbackSize);
+  return {
+    c: _fallbackCenter.clone(),
+    u0: _axisX.clone(),
+    u1: _axisY.clone(),
+    u2: _axisZ.clone(),
+    half: [_fallbackSize.x * 0.5, _fallbackSize.y * 0.5, _fallbackSize.z * 0.5],
+  };
+}
+
+const _fallbackCenter = new Vector3();
+const _fallbackSize = new Vector3();
+const _axisX = new Vector3(1, 0, 0);
+const _axisY = new Vector3(0, 1, 0);
+const _axisZ = new Vector3(0, 0, 1);
+
+const _lc = new Vector3();
+const _ls = new Vector3();
+const _wx = new Vector3();
+const _wy = new Vector3();
+const _wz = new Vector3();
+
+function getMeshWorldObb(mesh: Mesh): OBB | null {
+  const g = mesh.geometry;
+  if (!g) return null;
+  if (!g.boundingBox) g.computeBoundingBox?.();
+  const bb = g.boundingBox;
+  if (!bb) return null;
+
+  mesh.updateWorldMatrix(true, false);
+
+  bb.getCenter(_lc);
+  bb.getSize(_ls).multiplyScalar(0.5);
+
+  // Extract world axes (including scale) from matrixWorld columns
+  const e = mesh.matrixWorld.elements;
+  _wx.set(e[0], e[1], e[2]);
+  _wy.set(e[4], e[5], e[6]);
+  _wz.set(e[8], e[9], e[10]);
+
+  const sx = _wx.length();
+  const sy = _wy.length();
+  const sz = _wz.length();
+  if (sx <= 0 || sy <= 0 || sz <= 0) return null;
+
+  const u0 = _wx.clone().multiplyScalar(1 / sx);
+  const u1 = _wy.clone().multiplyScalar(1 / sy);
+  const u2 = _wz.clone().multiplyScalar(1 / sz);
+
+  const c = _lc.clone().applyMatrix4(mesh.matrixWorld);
+  return {
+    c,
+    u0,
+    u1,
+    u2,
+    half: [_ls.x * sx, _ls.y * sy, _ls.z * sz],
+  };
+}
+
+function obbIntersectsObb(a: OBB, b: OBB) {
+  // SAT OBB vs OBB (Ericson). Uses global scratch _t for translation in A frame.
+  const EPS = 1e-7;
+
+  // Rotation matrix from B into A: R[i][j] = dot(Ai, Bj)
+  const R00 = a.u0.dot(b.u0), R01 = a.u0.dot(b.u1), R02 = a.u0.dot(b.u2);
+  const R10 = a.u1.dot(b.u0), R11 = a.u1.dot(b.u1), R12 = a.u1.dot(b.u2);
+  const R20 = a.u2.dot(b.u0), R21 = a.u2.dot(b.u1), R22 = a.u2.dot(b.u2);
+
+  const AR00 = Math.abs(R00) + EPS, AR01 = Math.abs(R01) + EPS, AR02 = Math.abs(R02) + EPS;
+  const AR10 = Math.abs(R10) + EPS, AR11 = Math.abs(R11) + EPS, AR12 = Math.abs(R12) + EPS;
+  const AR20 = Math.abs(R20) + EPS, AR21 = Math.abs(R21) + EPS, AR22 = Math.abs(R22) + EPS;
+
+  // Translation t in A frame
+  _t.copy(b.c).sub(a.c);
+  const t0 = _t.dot(a.u0);
+  const t1 = _t.dot(a.u1);
+  const t2 = _t.dot(a.u2);
+
+  const Ax = a.half[0], Ay = a.half[1], Az = a.half[2];
+  const Bx = b.half[0], By = b.half[1], Bz = b.half[2];
+
+  // Test A axes
+  let ra = Ax;
+  let rb = Bx * AR00 + By * AR01 + Bz * AR02;
+  if (Math.abs(t0) > ra + rb) return false;
+
+  ra = Ay;
+  rb = Bx * AR10 + By * AR11 + Bz * AR12;
+  if (Math.abs(t1) > ra + rb) return false;
+
+  ra = Az;
+  rb = Bx * AR20 + By * AR21 + Bz * AR22;
+  if (Math.abs(t2) > ra + rb) return false;
+
+  // Test B axes
+  const tB0 = t0 * R00 + t1 * R10 + t2 * R20;
+  ra = Ax * AR00 + Ay * AR10 + Az * AR20;
+  rb = Bx;
+  if (Math.abs(tB0) > ra + rb) return false;
+
+  const tB1 = t0 * R01 + t1 * R11 + t2 * R21;
+  ra = Ax * AR01 + Ay * AR11 + Az * AR21;
+  rb = By;
+  if (Math.abs(tB1) > ra + rb) return false;
+
+  const tB2 = t0 * R02 + t1 * R12 + t2 * R22;
+  ra = Ax * AR02 + Ay * AR12 + Az * AR22;
+  rb = Bz;
+  if (Math.abs(tB2) > ra + rb) return false;
+
+  // Test cross products Ai x Bj
+  // A0 x B0
+  ra = Ay * AR20 + Az * AR10;
+  rb = By * AR02 + Bz * AR01;
+  if (Math.abs(t2 * R10 - t1 * R20) > ra + rb) return false;
+  // A0 x B1
+  ra = Ay * AR21 + Az * AR11;
+  rb = Bx * AR02 + Bz * AR00;
+  if (Math.abs(t2 * R11 - t1 * R21) > ra + rb) return false;
+  // A0 x B2
+  ra = Ay * AR22 + Az * AR12;
+  rb = Bx * AR01 + By * AR00;
+  if (Math.abs(t2 * R12 - t1 * R22) > ra + rb) return false;
+
+  // A1 x B0
+  ra = Ax * AR20 + Az * AR00;
+  rb = By * AR12 + Bz * AR11;
+  if (Math.abs(t0 * R20 - t2 * R00) > ra + rb) return false;
+  // A1 x B1
+  ra = Ax * AR21 + Az * AR01;
+  rb = Bx * AR12 + Bz * AR10;
+  if (Math.abs(t0 * R21 - t2 * R01) > ra + rb) return false;
+  // A1 x B2
+  ra = Ax * AR22 + Az * AR02;
+  rb = Bx * AR11 + By * AR10;
+  if (Math.abs(t0 * R22 - t2 * R02) > ra + rb) return false;
+
+  // A2 x B0
+  ra = Ax * AR10 + Ay * AR00;
+  rb = By * AR22 + Bz * AR21;
+  if (Math.abs(t1 * R00 - t0 * R10) > ra + rb) return false;
+  // A2 x B1
+  ra = Ax * AR11 + Ay * AR01;
+  rb = Bx * AR22 + Bz * AR20;
+  if (Math.abs(t1 * R01 - t0 * R11) > ra + rb) return false;
+  // A2 x B2
+  ra = Ax * AR12 + Ay * AR02;
+  rb = Bx * AR21 + By * AR20;
+  if (Math.abs(t1 * R02 - t0 * R12) > ra + rb) return false;
+
+  return true;
+}
 
 function restoreAll(meshes: Mesh[], saved: WeakMap<Mesh, SavedMaterial[]>) {
   for (const mesh of meshes) {

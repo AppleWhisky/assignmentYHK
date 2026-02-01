@@ -12,10 +12,6 @@ function layerHue(layer: number) {
   return ((layer * 137.508) % 360 + 360) % 360;
 }
 
-function clampNumber(n: number) {
-  return Number.isFinite(n) ? n : 0;
-}
-
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -377,11 +373,22 @@ const AnimStepNode = (props: { id: string; data: AnimNodeDataView; selected?: bo
   const [layerText, setLayerText] = useState(() =>
     String(Number.isFinite(props.data.layer) ? Math.max(1, Math.floor(props.data.layer)) : 1),
   );
+  const [endText, setEndText] = useState(() =>
+    Number.isFinite(props.data.endDeg) ? String(Number(props.data.endDeg.toFixed(2))) : '0',
+  );
+  const endActiveRef = useRef(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLayerText(String(Number.isFinite(props.data.layer) ? Math.max(1, Math.floor(props.data.layer)) : 1));
   }, [props.data.layer]);
+
+  // Keep endText in sync when not actively editing.
+  useEffect(() => {
+    if (endActiveRef.current) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEndText(Number.isFinite(props.data.endDeg) ? String(Number(props.data.endDeg.toFixed(2))) : '0');
+  }, [props.data.endDeg]);
 
   const commitLayer = () => {
     const n = Math.floor(Number(layerText));
@@ -393,6 +400,24 @@ const AnimStepNode = (props: { id: string; data: AnimNodeDataView; selected?: bo
     const clamped = Math.min(Math.max(n, 1), 999);
     if (clamped !== Math.floor(props.data.layer)) updateNode(props.id, { layer: clamped });
     setLayerText(String(clamped));
+  };
+
+  const allowNum = (s: string) => /^-?\d*(?:\.\d*)?$/.test(s);
+  const commitEnd = () => {
+    endActiveRef.current = false;
+    const raw = endText.trim();
+    const prev = props.data.endDeg;
+    if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
+      setEndText(Number.isFinite(prev) ? String(Number(prev.toFixed(2))) : '0');
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      setEndText(Number.isFinite(prev) ? String(Number(prev.toFixed(2))) : '0');
+      return;
+    }
+    updateNode(props.id, { endDeg: n });
+    setEndText(String(Number(n.toFixed(2))));
   };
 
   const layerInt = Math.max(1, Math.floor(props.data.layer));
@@ -483,7 +508,19 @@ const AnimStepNode = (props: { id: string; data: AnimNodeDataView; selected?: bo
               // Don’t start node-drag while editing.
               e.stopPropagation();
             }}
-            style={{ width: 64 }}
+            style={{
+              width: 64,
+              border: '1px solid var(--panel-border)',
+              background: 'rgba(0, 0, 0, 0.28)',
+              color: '#60a5fa',
+              borderRadius: 10,
+              padding: '6px 8px',
+              fontWeight: 600,
+              fontSize: 12,
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+              fontVariantNumeric: 'tabular-nums',
+            }}
           />
         </div>
         <button className="topHudBtn" onClick={() => removeNode(props.id)} style={{ padding: '4px 8px', fontSize: 11, borderColor: 'rgba(239, 68, 68, 0.45)' }}>
@@ -526,7 +563,47 @@ const AnimStepNode = (props: { id: string; data: AnimNodeDataView; selected?: bo
           </div>
           <div className="animField">
             <div className="animFieldLabel">End (deg)</div>
-            <input type="number" value={Number.isFinite(props.data.endDeg) ? Number(props.data.endDeg.toFixed(2)) : 0} step={0.5} onChange={(e) => updateNode(props.id, { endDeg: clampNumber(Number(e.target.value)) })} />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={endText}
+              onFocus={(e) => {
+                endActiveRef.current = true;
+                // UX: allow quick "-5" without manual clearing
+                (e.currentTarget as HTMLInputElement).select();
+              }}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!allowNum(v)) return;
+                setEndText(v);
+              }}
+              onBlur={() => commitEnd()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+                if (e.key === 'Escape') {
+                  endActiveRef.current = false;
+                  setEndText(Number.isFinite(props.data.endDeg) ? String(Number(props.data.endDeg.toFixed(2))) : '0');
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+              }}
+              onWheel={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                (e.currentTarget as HTMLInputElement).blur();
+              }}
+              style={{
+                border: '1px solid var(--panel-border)',
+                background: 'rgba(0, 0, 0, 0.28)',
+                color: '#60a5fa',
+                borderRadius: 10,
+                padding: '6px 8px',
+                fontWeight: 600,
+                fontSize: 12,
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            />
           </div>
         </div>
       </div>

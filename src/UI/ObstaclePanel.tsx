@@ -1,7 +1,6 @@
 import { degToRad, radToDeg } from '@/utils/angles';
 import { useSimStore } from '@/store/useSimStore';
-
-const clampNumber = (n: number) => (Number.isFinite(n) ? n : 0);
+import { useEffect, useRef, useState } from 'react';
 
 type AxisKey = 'X' | 'Y' | 'Z';
 const AXIS_BADGE_BG: Record<AxisKey, string> = {
@@ -42,6 +41,45 @@ const Vec3Row = (props: {
 }) => {
   const step = props.step ?? 0.01;
   const [x, y, z] = props.value;
+
+  const fmt = (n: number) => (Number.isFinite(n) ? String(Number(n.toFixed(3))) : '0');
+  const [text, setText] = useState<{ x: string; y: string; z: string }>(() => ({
+    x: fmt(x),
+    y: fmt(y),
+    z: fmt(z),
+  }));
+  const activeRef = useRef<'x' | 'y' | 'z' | null>(null);
+
+  useEffect(() => {
+    setText((t) => ({
+      x: activeRef.current === 'x' ? t.x : fmt(x),
+      y: activeRef.current === 'y' ? t.y : fmt(y),
+      z: activeRef.current === 'z' ? t.z : fmt(z),
+    }));
+  }, [x, y, z]);
+
+  const allow = (s: string) => /^-?\d*(?:\.\d*)?$/.test(s);
+  const commit = (axis: 'x' | 'y' | 'z') => {
+    const raw = text[axis].trim();
+    activeRef.current = null;
+    const prev = axis === 'x' ? x : axis === 'y' ? y : z;
+    if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
+      setText((t) => ({ ...t, [axis]: fmt(prev) }));
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      setText((t) => ({ ...t, [axis]: fmt(prev) }));
+      return;
+    }
+    const next: [number, number, number] = [
+      axis === 'x' ? n : x,
+      axis === 'y' ? n : y,
+      axis === 'z' ? n : z,
+    ];
+    props.onChange(next);
+    setText((t) => ({ ...t, [axis]: fmt(n) }));
+  };
   return (
     <div
       style={{
@@ -77,10 +115,33 @@ const Vec3Row = (props: {
       >
         <AxisBadge axis="X" />
         <input
-          type="number"
-          value={Number.isFinite(x) ? Number(x.toFixed(3)) : 0}
+          type="text"
+          inputMode="decimal"
+          value={text.x}
           step={step}
-          onChange={(e) => props.onChange([clampNumber(Number(e.target.value)), y, z])}
+          onFocus={(e) => {
+            activeRef.current = 'x';
+            // UX: allow quickly typing "-5" without manual clearing
+            (e.currentTarget as HTMLInputElement).select();
+          }}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!allow(v)) return;
+            setText((t) => ({ ...t, x: v }));
+          }}
+          onBlur={() => commit('x')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            if (e.key === 'Escape') {
+              setText((t) => ({ ...t, x: fmt(x) }));
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          onWheel={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            (e.currentTarget as HTMLInputElement).blur();
+          }}
           style={{
             width: '100%',
             background: 'transparent',
@@ -104,10 +165,32 @@ const Vec3Row = (props: {
       >
         <AxisBadge axis="Y" />
         <input
-          type="number"
-          value={Number.isFinite(y) ? Number(y.toFixed(3)) : 0}
+          type="text"
+          inputMode="decimal"
+          value={text.y}
           step={step}
-          onChange={(e) => props.onChange([x, clampNumber(Number(e.target.value)), z])}
+          onFocus={(e) => {
+            activeRef.current = 'y';
+            (e.currentTarget as HTMLInputElement).select();
+          }}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!allow(v)) return;
+            setText((t) => ({ ...t, y: v }));
+          }}
+          onBlur={() => commit('y')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            if (e.key === 'Escape') {
+              setText((t) => ({ ...t, y: fmt(y) }));
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          onWheel={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            (e.currentTarget as HTMLInputElement).blur();
+          }}
           style={{
             width: '100%',
             background: 'transparent',
@@ -131,10 +214,32 @@ const Vec3Row = (props: {
       >
         <AxisBadge axis="Z" />
         <input
-          type="number"
-          value={Number.isFinite(z) ? Number(z.toFixed(3)) : 0}
+          type="text"
+          inputMode="decimal"
+          value={text.z}
           step={step}
-          onChange={(e) => props.onChange([x, y, clampNumber(Number(e.target.value))])}
+          onFocus={(e) => {
+            activeRef.current = 'z';
+            (e.currentTarget as HTMLInputElement).select();
+          }}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!allow(v)) return;
+            setText((t) => ({ ...t, z: v }));
+          }}
+          onBlur={() => commit('z')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            if (e.key === 'Escape') {
+              setText((t) => ({ ...t, z: fmt(z) }));
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          onWheel={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            (e.currentTarget as HTMLInputElement).blur();
+          }}
           style={{
             width: '100%',
             background: 'transparent',
@@ -260,7 +365,13 @@ export const ObstaclePanel = () => {
             label="Scale"
             value={selectedObstacle.size}
             step={0.01}
-            onChange={(next) => updateObstacleSize(selectedObstacle.id, next)}
+            onChange={(next) =>
+              updateObstacleSize(selectedObstacle.id, [
+                Math.max(0, next[0]),
+                Math.max(0, next[1]),
+                Math.max(0, next[2]),
+              ])
+            }
           />
         </div>
       ) : (

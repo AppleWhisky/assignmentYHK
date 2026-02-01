@@ -54,11 +54,12 @@ export const createPlaybackSlice: StateCreator<SimState, [], [], PlaybackSlice> 
     // UX: keep simulator tidy while playing
     get().setTransformInteracting(false);
     get().setJointGizmoActive(false);
-    get().setSelected({ kind: 'robot' });
+    // Avoid mounting TransformControls during playback (can cause unintended robotPosition updates)
+    get().setSelected(null);
 
     // Start baseline: if a target has no previous layer, it starts from 0.
     // To prevent visible jumps, reset all controllable targets to 0 at playback start.
-    get().setRobotYawRad(0);
+    // NOTE: do not reset robotPosition (and avoid forcing yaw to 0) — playback should not "teleport" the robot.
     for (const j of get().joints) {
       get().setJointAngle(j.name, 0);
     }

@@ -79,6 +79,7 @@ const SceneContents = () => {
   const axisOverrides = useSimStore((s) => s.jointAxisOverrides);
   const selected = useSimStore((s) => s.selected);
   const jointGizmoActive = useSimStore((s) => s.jointGizmoActive);
+  const playbackStatus = useSimStore((s) => s.playback.status);
   const robotPosition = useSimStore((s) => s.robotPosition);
   const robotYawRad = useSimStore((s) => s.robotYawRad);
   const setRobotPositionXZ = useSimStore((s) => s.setRobotPositionXZ);
@@ -122,6 +123,7 @@ const SceneContents = () => {
   }, [setTransformInteracting]);
 
   useEffect(() => {
+    if (playbackStatus === 'playing') return;
     if (!robotMoveControlsRef.current || !robotMoveObj) return;
     const controls = robotMoveControlsRef.current;
     const controlsAny = controls as unknown as {
@@ -141,6 +143,8 @@ const SceneContents = () => {
       setTransformInteracting(false);
     };
     const onObjectChange = () => {
+      // Safety: never allow playback to mutate robotPosition via stale control events.
+      if (useSimStore.getState().playback.status === 'playing') return;
       const o = robotMoveRef.current;
       if (!o) return;
       // Constrain to ground plane
@@ -158,7 +162,7 @@ const SceneContents = () => {
       controlsAny.removeEventListener('mouseUp', onMouseUp);
       controlsAny.removeEventListener('objectChange', onObjectChange);
     };
-  }, [robotMoveObj, setRobotPositionXZ, setTransformInteracting]);
+  }, [playbackStatus, robotMoveObj, setRobotPositionXZ, setTransformInteracting]);
 
   // Apply store joint angles to the `_Rotation` nodes.
   useFrame(() => {
@@ -273,7 +277,7 @@ const SceneContents = () => {
       </group>
 
       {/* Robot base move gizmo: X/Z only (no Y) */}
-      {selected?.kind === 'robot' && robotMoveObj ? (
+      {playbackStatus !== 'playing' && selected?.kind === 'robot' && robotMoveObj ? (
         <TransformControls
           ref={robotMoveControlsRef}
           object={robotMoveObj}
