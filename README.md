@@ -8,7 +8,8 @@
 ## 1) 프로젝트 개요
 
 ### 목표
-- 브라우저에서 로봇을 조작하기 전, 운영자가 **웹 기반 디지털 트윈**으로
+브라우저에서 로봇을 조작하기 전, 운영자가 **웹 기반 디지털 트윈**으로
+
   - Three.js를 활용하여 로봇 팔과 작업 공간을 3D로 시각화
   - Joint(관절 각도)를 제어할 수 있는 조그(Jog) 컨트롤러 패널 설계
   - 사용자가 3D 공간 내에 가상의 장애물(박스 형태)을 추가·배치
@@ -16,7 +17,8 @@
   - 충돌 테스트를 구현하기 위한 애니메이션 생성 기능
   - 애니메이션 기반 “충돌 시뮬레이션 재생”
   - 충돌 로그 확인(리포트)
-  를 한 흐름으로 수행할 수 있게 하는 것이 목표입니다.
+
+를 한 흐름으로 수행할 수 있게 하는 것이 목표입니다.
 
 ### 기술 스택
 - **React + TypeScript**
@@ -35,6 +37,9 @@
 - **장애물(박스) 추가/배치**: 구현 완료
 - **충돌 예상 시 시각적 경고**: 구현 완료
   - 근접 경고 / 접촉 충돌 시 robot과 obstacle 색상 변환
+
+[이미지 자료] 완성 프로젝트 스크린샷
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 05 39" src="https://github.com/user-attachments/assets/d3709c88-03c3-4178-875d-ca56275a55a5" />
 
 ---
 
@@ -119,6 +124,9 @@ src/assets/hdri/                  # 기본 HDRI
 - 시뮬레이션 선택, 재생, 옵션 제어
 - 로봇 위치 제어 및 초기화
 
+[이미지 자료] 화면 우측 UI. 각 joint 조절 UI와 시뮬레이션용 UI 확인가능
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 10 23" src="https://github.com/user-attachments/assets/986878f5-b502-4d67-b53a-fa56e9b8b300" />
+
 관련 파일:
 - `src/UI/JogPanel.tsx`
 - `src/store/slices/robotSlice.ts`
@@ -128,6 +136,10 @@ src/assets/hdri/                  # 기본 HDRI
 - 박스 장애물 추가/선택/삭제
 - 씬에서 gizmo로 이동/회전
 - 선택한 박스 위치/회전/크기 수정
+
+[이미지 자료] 화면 좌측에 UI. 박스 추가, obstacle List, property UI 확인 가능
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 11 08" src="https://github.com/user-attachments/assets/06f59a6e-0e23-4163-9575-6ae1f1e4461f" />
+
 
 관련 파일:
 - `src/UI/ObstaclePanel.tsx`
@@ -140,6 +152,10 @@ src/assets/hdri/                  # 기본 HDRI
 - 현재 충돌 볼륨은 회전/스케일 변화에서도 안정적인 **OBB 기반**으로 체크
   - Warning은 `WARNING_MARGIN` 기반 “근접 영역” 확장으로 처리
 
+[이미지 자료] 충돌 시 red,  위험 시 orange 색상으로 변화
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 12 55" src="https://github.com/user-attachments/assets/4bde1914-bdbe-4f8f-a4b6-af9af93686b2" />
+
+
 관련 파일:
 - `src/Three/Collision/CollisionSystem.tsx`
 - `src/Three/Collision/CollisionDebugBoxes.tsx`
@@ -149,6 +165,13 @@ src/assets/hdri/                  # 기본 HDRI
 - ReactFlow 기반 오버레이 에디터
 - Layer(정수) = 1초 슬롯 기반 타임라인 모델
 - JSON Import/Export 지원
+- layout, Layer 확인용 UI 제공
+- Pingpong 식 loop animation 생성 제공
+
+[이미지 자료] 박스 기반 애니메이션 UI 제공. 각 애니메이션의 Layer와 변화값 설정이 가능. Json 기반 import, export 제공. 우측에 전체 layout 확인용 UI 제공
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 13 21" src="https://github.com/user-attachments/assets/e87a7500-dd86-45d1-b636-8305825afe3f" />
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 36 43" src="https://github.com/user-attachments/assets/33879e67-4195-4ce7-9a9d-3a305cdf6025" />
+
 
 관련 파일:
 - `src/UI/AnimationEditor/AnimationEditorOverlay.tsx`
@@ -162,6 +185,13 @@ src/assets/hdri/                  # 기본 HDRI
   - 충돌 시 멈추고 report를 생성
   - 옵션 끌 시 충돌시 멈춤없이 계속 report 작성
 
+### [제공자료] 업로드한 비디오 파일의 확인을 부탁드립니다 (mac으로 생성해서 mov인점 양해부탁합니다)
+- 애니메이션 재생, 충돌 없음 : animation_noCollision.mov
+- 애니메이션 재생, 충돌 시 멈춤 : animation_stopCollision.mov
+- 애니메이션 재생, loop 재생, collision 멈춤없이 report 계속 작성 : animation_noStop_longReport.mov
+
+
+
 관련 파일:
 - `src/Three/Animation/AnimationPlayer.tsx`
 - `src/store/slices/playbackSlice.ts`
@@ -172,6 +202,12 @@ src/assets/hdri/                  # 기본 HDRI
   - BottomBar: 최신 충돌 + Full report
   - Modal: 전체 로그 + Copy/Clear
   - log 없을 시 UI를 감춤
+ 
+[이미지 자료] 시뮬레이션 완료 시 충돌 시간과 지점에 대한 report 확인 가능
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 33 53" src="https://github.com/user-attachments/assets/b95eaec5-926a-4861-8a83-641ac0a05587" />
+<img width="1512" height="859" alt="스크린샷 2026-02-01 오후 8 36 19" src="https://github.com/user-attachments/assets/74851062-7fba-4101-9868-4c7ccff21fd6" />
+
+
 
 관련 파일:
 - `src/UI/BottomBar.tsx`
@@ -208,15 +244,12 @@ src/assets/hdri/                  # 기본 HDRI
 
 ---
 
-## 8) 알려진 이슈 / 추가 개선 방향
+## 8) 추가 개선 방향
 
-### 알려진 이슈
-- `BaseYaw`가 포함된 애니메이션 재생 시작 시, 일부 환경에서 로봇 베이스 XZ 위치가 `(0,0,0)`으로 스냅되는 현상이 보고됨  
-  - TransformControls 가드/비활성화 등 완화는 적용했으나, 재현 시 `robotPosition` 변경 경로의 추가 추적이 필요
 
 ### 추가 개선 방향(예시)
 - 정밀 충돌: BVH 기반 mesh collision 또는 collider 프록시(capsule/convex) 도입
-- self-collision: 더 안정적인 collider 정의 후 옵션으로 재도입
-- 시뮬레이션 안정화: deterministic replay / step 분리 등
+- self-collision: 현재 모델링의 한계로 정확한 self-collision이 확인 불가능. 모델의 개선과 self-collision 로직의 개선이 필요 
+- 시뮬레이션 안정화: 애니메이션 제작 기능의 개선과. 미리 시뮬레이션 예측 기능 제공이 필요
 - 로봇팔을 쉽게 제어 가능한 IK rig 제공
   - 현재는 parent-child 기반 robot을 만들어서 rig 기반이 아님으로 ik rig를 제공하지 않음
