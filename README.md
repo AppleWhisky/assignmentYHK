@@ -7,12 +7,14 @@
 
 ## 1) 프로젝트 개요
 
-### 목표(과제 재해석)
+### 목표
 - 브라우저에서 로봇을 조작하기 전, 운영자가 **웹 기반 디지털 트윈**으로
-  - 로봇 자세(JOG) 조작
-  - 장애물 배치
-  - 충돌 위험 확인(경고/충돌 시각화)
-  - 애니메이션 기반 “시뮬레이션 재생”
+  - Three.js를 활용하여 로봇 팔과 작업 공간을 3D로 시각화
+  - Joint(관절 각도)를 제어할 수 있는 조그(Jog) 컨트롤러 패널 설계
+  - 사용자가 3D 공간 내에 가상의 장애물(박스 형태)을 추가·배치
+  - 로봇 조작 시 장애물과 충돌이 예상될 경우 시각적 경고
+  - 충돌 테스트를 구현하기 위한 애니메이션 생성 기능
+  - 애니메이션 기반 “충돌 시뮬레이션 재생”
   - 충돌 로그 확인(리포트)
   를 한 흐름으로 수행할 수 있게 하는 것이 목표입니다.
 
@@ -29,10 +31,10 @@
 - **3D 시각화(Three.js)**: 구현 완료
   - 단순화된 로봇 팔(3축 이상) + 작업공간(바닥/그리드)
 - **JOG 컨트롤러 UI**: 구현 완료
-  - Joint 각도 제어 + 베이스 Yaw 제어 + 로봇 베이스 XZ 이동
+  - 각 축에 대한 회전을 Slider와 버튼으로 제어
 - **장애물(박스) 추가/배치**: 구현 완료
 - **충돌 예상 시 시각적 경고**: 구현 완료
-  - 근접 경고 / 접촉 충돌 시 robot mesh tint 변환
+  - 근접 경고 / 접촉 충돌 시 robot과 obstacle 색상 변환
 
 ---
 
@@ -113,10 +115,9 @@ src/assets/hdri/                  # 기본 HDRI
 ## 5) 핵심 기능 상세
 
 ### 5.1 JOG 기능 & UI
-- Joint angle 제어(슬라이더 + hold-to-repeat 버튼)
-- 베이스 Yaw 제어
-- 로봇 베이스 XZ 이동(TransformControls 기반)
-- 재생 중에는 JOG 입력을 잠금하여 수동 조작과 재생 충돌을 방지
+- Joint angle 제어
+- 시뮬레이션 선택, 재생, 옵션 제어
+- 로봇 위치 제어 및 초기화
 
 관련 파일:
 - `src/UI/JogPanel.tsx`
@@ -126,8 +127,7 @@ src/assets/hdri/                  # 기본 HDRI
 ### 5.2 장애물(Obstacle) 추가/변경 & UI
 - 박스 장애물 추가/선택/삭제
 - 씬에서 gizmo로 이동/회전
-- 수치 입력 UX 개선(leading 0 고정 문제 개선)
-- Scale 음수 입력 방지(0 이상 클램프)
+- 선택한 박스 위치/회전/크기 수정
 
 관련 파일:
 - `src/UI/ObstaclePanel.tsx`
@@ -148,8 +148,7 @@ src/assets/hdri/                  # 기본 HDRI
 ### 5.4 Animation 생성 기능(Animator)
 - ReactFlow 기반 오버레이 에디터
 - Layer(정수) = 1초 슬롯 기반 타임라인 모델
-- Target: `BaseYaw` 또는 특정 joint
-- JSON Import/Export 지원(구버전 포맷 마이그레이션 포함)
+- JSON Import/Export 지원
 
 관련 파일:
 - `src/UI/AnimationEditor/AnimationEditorOverlay.tsx`
@@ -160,6 +159,8 @@ src/assets/hdri/                  # 기본 HDRI
 - Simulation Start/Stop
 - loop 모드 지원(예: pingpong)
 - 옵션: Stop on collision
+  - 충돌 시 멈추고 report를 생성
+  - 옵션 끌 시 충돌시 멈춤없이 계속 report 작성
 
 관련 파일:
 - `src/Three/Animation/AnimationPlayer.tsx`
@@ -167,10 +168,10 @@ src/assets/hdri/                  # 기본 HDRI
 
 ### 5.6 Report 기능(충돌 로그)
 - 충돌 이벤트를 “enter event”로 기록(지속 접촉에서 프레임마다 스팸 방지)
-- 시간은 루프에서도 계속 증가하는 **monotonic simulation time** 사용
 - UI:
   - BottomBar: 최신 충돌 + Full report
   - Modal: 전체 로그 + Copy/Clear
+  - log 없을 시 UI를 감춤
 
 관련 파일:
 - `src/UI/BottomBar.tsx`
@@ -183,9 +184,9 @@ src/assets/hdri/                  # 기본 HDRI
 
 ### 6.1 운영자 워크플로우 확장
 - 단순 “조작 + 경고”를 넘어:
-  - Animator로 작업 시나리오 제작
-  - Simulation으로 재생
-  - Report로 사후 검토
+  - Animator 제작
+  - Animation 기반 Simulation 실행
+  - Report로 충돌 시간과 위치 확인
   까지 일관된 UX 제공
 
 ### 6.2 디버그/검증 도구 제공
@@ -196,11 +197,6 @@ src/assets/hdri/                  # 기본 HDRI
 ### 6.3 유지보수 가능한 상태 구조
 - Zustand store를 slice로 분리하여
   - 애니메이션/시뮬레이션/충돌/리포트 기능이 추가되어도 구조 유지
-
-### 6.4 UX/성능 고려
-- 숫자 입력 UX(leading 0/삭제/음수 입력 문제 개선)
-- 재생 중 JOG 잠금, TransformControls 부작용 방어
-- 리소스 라이프사이클 관리(Obstacle 재질/지오메트리 생성 최소화)
 
 ---
 
@@ -222,3 +218,5 @@ src/assets/hdri/                  # 기본 HDRI
 - 정밀 충돌: BVH 기반 mesh collision 또는 collider 프록시(capsule/convex) 도입
 - self-collision: 더 안정적인 collider 정의 후 옵션으로 재도입
 - 시뮬레이션 안정화: deterministic replay / step 분리 등
+- 로봇팔을 쉽게 제어 가능한 IK rig 제공
+  - 현재는 parent-child 기반 robot을 만들어서 rig 기반이 아님으로 ik rig를 제공하지 않음
