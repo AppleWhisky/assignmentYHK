@@ -249,6 +249,7 @@ src/assets/hdri/                  # 기본 HDRI
 ### 추가 개선 방향(예시)
 - 정밀 충돌: BVH 기반 mesh collision 또는 collider 프록시(capsule/convex) 도입
 - self-collision: 현재 모델링의 한계로 정확한 self-collision이 확인 불가능. 모델의 개선과 self-collision 로직의 개선이 필요 
-- 시뮬레이션 안정화: 애니메이션 제작 기능의 개선과. 미리 시뮬레이션 예측 기능 제공이 필요
+- 시뮬레이션 개선: 애니메이션 제작 기능의 개선과 미리 시뮬레이션 예측 기능 제공이 필요
+- 비쥬얼 개선:visual quality를 개선한 postprocessing을 제공하여 퀄리티 좋은 렌더링 제공
 - 로봇팔을 쉽게 제어 가능한 IK rig 제공
   - 현재는 parent-child 기반 robot을 만들어서 rig 기반이 아님으로 ik rig를 제공하지 않음
