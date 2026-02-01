@@ -220,19 +220,22 @@ src/assets/hdri/                  # 기본 HDRI
 
 ### 6.1 운영자 워크플로우 확장
 - 단순 “조작 + 경고”를 넘어:
-  - Animator 제작
-  - Animation 기반 Simulation 실행
+  - Animation 제작 (+저장, 불러오기)
+  - 제작한 Animation 기반 Simulation 실행 (+ 충돌 시 행동 옵션 제공)
   - Report로 충돌 시간과 위치 확인
   까지 일관된 UX 제공
 
 ### 6.2 디버그/검증 도구 제공
-- Boxes 토글로 충돌 볼륨을 시각화하여
+- Bounding Boxes 토글로 충돌 볼륨 시각화
   - 충돌 결과의 신뢰성/근거를 사용자에게 제공
   - 개발/튜닝 과정에서도 빠른 검증 가능
+- Report 검증
+  - Collision 시간과 part, obastacle 확인 가능
+  - 제대로 된 결과인지 검증 가능
+- Animation 저장
+  - json 기반 import/export로 쉽게 사용 가능
+  - 쉬운 공유와 불러오기로 유저간 쉬운 검증 경험 제공 
 
-### 6.3 유지보수 가능한 상태 구조
-- Zustand store를 slice로 분리하여
-  - 애니메이션/시뮬레이션/충돌/리포트 기능이 추가되어도 구조 유지
 
 ---
 
