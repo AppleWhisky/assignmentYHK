@@ -185,11 +185,7 @@ src/assets/hdri/                  # 기본 HDRI
   - 충돌 시 멈추고 report를 생성
   - 옵션 끌 시 충돌시 멈춤없이 계속 report 작성
 
-### [제공자료] 업로드한 비디오 파일의 확인을 부탁드립니다 (mac으로 생성해서 mov인점 양해부탁합니다)
-- 애니메이션 재생, 충돌 없음 : animation_noCollision.mov
-- 애니메이션 재생, 충돌 시 멈춤 : animation_stopCollision.mov
-- 애니메이션 재생, loop 재생, collision 멈춤없이 report 계속 작성 : animation_noStop_longReport.mov
-
+### [제공자료] 업로드한 비디오 파일의 확인을 부탁드립니다
 
 
 관련 파일:
