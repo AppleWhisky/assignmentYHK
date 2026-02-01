@@ -64,6 +64,7 @@ export const AnimationEditorOverlay = () => {
 
   const draft = useSimStore((s) => s.animationDraft);
   const newDraft = useSimStore((s) => s.newAnimationDraft);
+  const importAnimationJsonToDraft = useSimStore((s) => s.importAnimationJsonToDraft);
   const setName = useSimStore((s) => s.setAnimationDraftName);
   const setLoopMode = useSimStore((s) => s.setAnimationDraftLoopMode);
   const addNode = useSimStore((s) => s.addAnimationDraftNode);
@@ -76,6 +77,7 @@ export const AnimationEditorOverlay = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const draftIdRef = useRef<string | null>(null);
   const [highlightLayer, setHighlightLayer] = useState<number | null>(null);
+  const importRef = useRef<HTMLInputElement | null>(null);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AnimNodeDataView>(toFlowNodes(draft.nodes, null));
 
@@ -145,7 +147,13 @@ export const AnimationEditorOverlay = () => {
 
   return (
     <div className="animOverlay" onWheel={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()}>
-      <div className="animOverlayBackdrop" onClick={() => setOpen(false)} />
+      <button
+        type="button"
+        className="animOverlayBackdrop"
+        aria-label="Close animation editor"
+        onClick={() => setOpen(false)}
+        style={{ border: 'none', padding: 0 }}
+      />
       <div className="animEditor">
         <div className="animEditorHeader">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
@@ -190,6 +198,40 @@ export const AnimationEditorOverlay = () => {
           <div style={{ flex: 1 }} />
 
           <div className="animToolbarGroup">
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const f = e.currentTarget.files?.[0] ?? null;
+                // allow re-importing same file
+                e.currentTarget.value = '';
+                if (!f) return;
+                try {
+                  const text = await f.text();
+                  const json = JSON.parse(text) as unknown;
+                  const r = importAnimationJsonToDraft(json);
+                  if (!r.ok) {
+                    setMsg({ kind: 'error', text: r.error });
+                    return;
+                  }
+                  setMsg({ kind: 'ok', text: 'Imported into draft. Click Save to add to library.' });
+                } catch (err) {
+                  const m = err instanceof Error ? err.message : 'Failed to import JSON.';
+                  setMsg({ kind: 'error', text: m });
+                }
+              }}
+            />
+            <button
+              className="topHudBtn"
+              onClick={() => {
+                setMsg(null);
+                importRef.current?.click();
+              }}
+            >
+              Import JSON
+            </button>
             <button className="topHudBtn" onClick={() => { setMsg(null); const r = saveDraftToLibrary(); if (!r.ok) setMsg({ kind: 'error', text: r.error }); else setMsg({ kind: 'ok', text: 'Saved.' }); }}>Save</button>
             <button
               className="topHudBtn"
@@ -197,7 +239,7 @@ export const AnimationEditorOverlay = () => {
                 setMsg(null);
                 const r = saveDraftToLibrary();
                 if (!r.ok) { setMsg({ kind: 'error', text: r.error }); return; }
-                const safeName = (draft.name || 'animation').replace(/[^\w\-]+/g, '_').slice(0, 64);
+                const safeName = (draft.name || 'animation').replace(/[^\w-]+/g, '_').slice(0, 64);
                 downloadJson(`robot-animation-${safeName}.json`, useSimStore.getState().savedAnimations.find((a) => a.id === r.id));
                 setMsg({ kind: 'ok', text: 'Exported JSON.' });
               }}
@@ -255,7 +297,6 @@ export const AnimationEditorOverlay = () => {
                       <button
                         key={layer}
                         type="button"
-                        role="listitem"
                         className={[
                           'animTimelineCell',
                           isEmpty ? 'isEmpty' : null,
@@ -338,6 +379,7 @@ const AnimStepNode = (props: { id: string; data: AnimNodeDataView; selected?: bo
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLayerText(String(Number.isFinite(props.data.layer) ? Math.max(1, Math.floor(props.data.layer)) : 1));
   }, [props.data.layer]);
 

@@ -5,6 +5,7 @@ import { Box3, Color, Mesh } from 'three';
 import type { Object3D } from 'three';
 import { useSimStore } from '@/store/useSimStore';
 import { boxDistance } from '@/utils/box';
+import type { ObstacleCollisionPair } from '@/store/useSimStore';
 
 type SavedMaterial = {
   mat: Material;
@@ -72,6 +73,8 @@ export const CollisionSystem = (props: {
     const collidingMeshes = new Set<string>();
     const warningObstacles = new Set<string>();
     const collidingObstacles = new Set<string>();
+    const warningPairs = new Set<string>();
+    const collidingPairs = new Set<string>();
 
     for (const mesh of robotMeshes) {
       if (!mesh.geometry) continue;
@@ -85,13 +88,17 @@ export const CollisionSystem = (props: {
         _boxB.copy(_tmp);
 
         if (_boxA.intersectsBox(_boxB)) {
-          collidingMeshes.add(mesh.name || mesh.uuid);
+          const meshKey = mesh.name || mesh.uuid;
+          collidingMeshes.add(meshKey);
           collidingObstacles.add(id);
+          collidingPairs.add(`${meshKey}::${id}`);
         } else {
           const d = boxDistance(_boxA, _boxB);
           if (d < 0.03) {
-            warningMeshes.add(mesh.name || mesh.uuid);
+            const meshKey = mesh.name || mesh.uuid;
+            warningMeshes.add(meshKey);
             warningObstacles.add(id);
+            warningPairs.add(`${meshKey}::${id}`);
           }
         }
       }
@@ -110,6 +117,14 @@ export const CollisionSystem = (props: {
       collidingMeshNames: Array.from(collidingMeshes),
       warningObstacleIds: Array.from(warningObstacles),
       collidingObstacleIds: Array.from(collidingObstacles),
+      warningPairs: Array.from(warningPairs).map((k) => {
+        const [mesh, obstacleId] = k.split('::');
+        return { mesh: mesh ?? '', obstacleId: obstacleId ?? '' } satisfies ObstacleCollisionPair;
+      }),
+      collidingPairs: Array.from(collidingPairs).map((k) => {
+        const [mesh, obstacleId] = k.split('::');
+        return { mesh: mesh ?? '', obstacleId: obstacleId ?? '' } satisfies ObstacleCollisionPair;
+      }),
     });
 
     applyTint(robotMeshes, saved.current, collidingMeshes, warningMeshes);

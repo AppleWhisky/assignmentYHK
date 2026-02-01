@@ -323,13 +323,16 @@ body {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  min-width: 520px;
+  /* Keep size stable so buttons don't shift as text changes */
+  width: 720px;
   max-width: calc(100% - 24px);
+  height: 48px;
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid var(--panel-border);
   background: var(--panel);
   backdrop-filter: blur(16px) saturate(180%);
+  overflow: hidden;
 }
 
 .animOverlay {

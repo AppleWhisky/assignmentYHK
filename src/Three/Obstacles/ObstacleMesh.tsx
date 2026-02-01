@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { Mesh } from 'three';
 import { BoxGeometry, Color, MeshStandardMaterial } from 'three';
 import type { ObstacleState } from '@/store/useSimStore';
@@ -19,8 +19,9 @@ export const ObstacleMesh = (props: {
 
   const fillHex = isColliding ? '#ef4444' : isWarning ? '#f59e0b' : isSelected ? '#3b82f6' : '#e2e8f0';
 
+  // Create once; update values to avoid GPU/material leaks.
   const material = useMemo(() => {
-    const c = new Color(fillHex);
+    const c = new Color('#e2e8f0');
     const m = new MeshStandardMaterial({
       color: c,
       transparent: false,
@@ -32,11 +33,24 @@ export const ObstacleMesh = (props: {
       polygonOffsetUnits: 1,
     });
     m.emissive = c.clone();
-    m.emissiveIntensity = isColliding ? 0.25 : isWarning ? 0.18 : 0.08;
+    m.setValues({ emissiveIntensity: 0.08 });
     return m;
-  }, [fillHex, isColliding, isWarning]);
+  }, []);
 
   const geometry = useMemo(() => new BoxGeometry(1, 1, 1), []);
+
+  useEffect(() => {
+    material.color.set(fillHex);
+    material.emissive.set(fillHex);
+    material.setValues({ emissiveIntensity: isColliding ? 0.25 : isWarning ? 0.18 : 0.08 });
+  }, [fillHex, isColliding, isWarning, material]);
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      material.dispose();
+    };
+  }, [geometry, material]);
 
   return (
     <mesh

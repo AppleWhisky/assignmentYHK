@@ -7,6 +7,8 @@ export const TopBar = () => {
   const obstacles = useSimStore((s) => s.obstacles);
   const showCollisionBoxes = useSimStore((s) => s.showCollisionBoxes);
   const setShowCollisionBoxes = useSimStore((s) => s.setShowCollisionBoxes);
+  const showReachability = useSimStore((s) => s.showReachability);
+  const setShowReachability = useSimStore((s) => s.setShowReachability);
   const resetRobotPose = useSimStore((s) => s.resetRobotPose);
   const resetCamera = useSimStore((s) => s.resetCamera);
   const resetScene = useSimStore((s) => s.resetScene);
@@ -94,6 +96,15 @@ export const TopBar = () => {
             onChange={(e) => setShowCollisionBoxes(e.target.checked)}
           />
           Boxes
+        </label>
+
+        <label className="topHudToggle" title="Show reachability guide (approx.)">
+          <input
+            type="checkbox"
+            checked={showReachability}
+            onChange={(e) => setShowReachability(e.target.checked)}
+          />
+          Reach
         </label>
 
         <button className="topHudBtn" onClick={() => resetCamera()}>

@@ -15,8 +15,10 @@ import { ObstaclesLayer } from '@/Three/Obstacles/ObstaclesLayer';
 import { ObstacleGizmo } from '@/Three/Gizmos/ObstacleGizmo';
 import { CollisionSystem } from '@/Three/Collision/CollisionSystem';
 import { CollisionDebugBoxes } from '@/Three/Collision/CollisionDebugBoxes';
+import { SelfCollisionSystem } from '@/Three/Collision/SelfCollisionSystem';
 import { Light } from '@/Three/Light';
 import { AnimationPlayer } from '@/Three/Animation/AnimationPlayer';
+import { ReachabilityRing } from '@/Three/Reachability/ReachabilityRing';
 
 const NO_RAYCAST = () => {
   // Intentionally empty: disables hit-testing for this object
@@ -52,8 +54,10 @@ export const RobotScene = () => {
 
 const _box = new Box3();
 const _size = new Vector3();
-const _pivotBox = new Box3();
 const _pivotCenter = new Vector3();
+const _pivotLocal = new Vector3();
+const _p0 = new Vector3();
+const _p1 = new Vector3();
 
 const SceneContents = () => {
   const { camera, gl } = useThree();
@@ -80,11 +84,13 @@ const SceneContents = () => {
   const setRobotPositionXZ = useSimStore((s) => s.setRobotPositionXZ);
   const setTransformInteracting = useSimStore((s) => s.setTransformInteracting);
   const transformInteracting = useSimStore((s) => s.transformInteracting);
+  const showReachability = useSimStore((s) => s.showReachability);
 
   const [robotRt, setRobotRt] = useState<RobotRuntime | null>(null);
   const [robotScale, setRobotScale] = useState(1);
   const [robotYOffset, setRobotYOffset] = useState(0);
   const [robotBasePivotLocalXZ, setRobotBasePivotLocalXZ] = useState<[number, number]>([0, 0]);
+  const [reachabilityRadius, setReachabilityRadius] = useState<number>(0);
   const didNormalizeRef = useRef(false);
   const robotMoveRef = useRef<Object3D | null>(null);
   const [robotMoveObj, setRobotMoveObj] = useState<Object3D | null>(null);
@@ -209,6 +215,8 @@ const SceneContents = () => {
         ref={setRobotMoveGroup}
         position={[robotPosition[0], 0, robotPosition[2]]}
       >
+        {showReachability ? <ReachabilityRing radius={reachabilityRadius} /> : null}
+
         {/* Yaw pivot group: rotate around Base center so yaw doesn't "move" the robot. */}
         <group
           position={[robotBasePivotLocalXZ[0] * robotScale, 0, robotBasePivotLocalXZ[1] * robotScale]}
@@ -222,29 +230,41 @@ const SceneContents = () => {
                   if (didNormalizeRef.current) return;
                   didNormalizeRef.current = true;
 
+                  rt.root.updateMatrixWorld(true);
                   _box.setFromObject(rt.root);
                   _box.getSize(_size);
                   const maxDim = Math.max(_size.x, _size.y, _size.z);
+                  const targetMax = 1.6;
+                  const scaleNow = Number.isFinite(maxDim) && maxDim > 0 ? targetMax / maxDim : 1;
                   if (Number.isFinite(maxDim) && maxDim > 0) {
-                    const targetMax = 1.6;
-                    const s = targetMax / maxDim;
-                    setRobotScale(s);
-                    setRobotYOffset(-_box.min.y * s);
+                    setRobotScale(scaleNow);
+                    setRobotYOffset(-_box.min.y * scaleNow);
                   }
 
                   // Find Base pivot (XZ) in root-local space for stable yaw rotation.
-                  let baseObj: Object3D | null = null;
-                  rt.root.traverse((o) => {
-                    if (baseObj) return;
-                    if (o.name === 'Base') baseObj = o;
-                  });
+                  const baseObj = rt.root.getObjectByName('Base') ?? null;
                   if (baseObj) {
-                    _pivotBox.setFromObject(baseObj);
-                    _pivotBox.getCenter(_pivotCenter);
-                    setRobotBasePivotLocalXZ([_pivotCenter.x, _pivotCenter.z]);
+                    // IMPORTANT: use the Base object's pivot (world position), not its bbox center.
+                    // bbox center can shift and causes yaw to orbit around a wrong point.
+                    baseObj.getWorldPosition(_pivotCenter);
+                    _pivotLocal.copy(_pivotCenter);
+                    rt.root.worldToLocal(_pivotLocal);
+                    setRobotBasePivotLocalXZ([_pivotLocal.x, _pivotLocal.z]);
                   } else {
                     setRobotBasePivotLocalXZ([0, 0]);
                   }
+
+                  // Reachability radius (auto): estimate from joint pivot chain length.
+                  // bbox-based XZ radius can be tiny if the arm is folded/upright in the home pose.
+                  const rig = buildArm01Rig(rt.root, {} as Record<string, 'x' | 'y' | 'z'>);
+                  let len = 0;
+                  for (let i = 1; i < rig.rotationNodes.length; i++) {
+                    rig.rotationNodes[i - 1]!.getWorldPosition(_p0);
+                    rig.rotationNodes[i]!.getWorldPosition(_p1);
+                    len += _p0.distanceTo(_p1);
+                  }
+                  // Scale to match the normalized robot size in-scene.
+                  setReachabilityRadius(Math.max(0.2, len * scaleNow + 0.08));
                 }}
               />
             </group>
@@ -290,6 +310,14 @@ const SceneContents = () => {
       <ObstacleGizmo obstacleObjectById={obstacleObjectById} />
 
       <CollisionSystem robotRoot={robotRt?.root ?? null} obstacleObjectById={obstacleObjectById} />
+      <SelfCollisionSystem
+        rotationNodes={rotationNodes}
+        thickness={0.08}
+        minIndexGap={2}
+        baseObject={robotRt?.root.getObjectByName('Base') ?? null}
+        basePadding={0.01}
+        baseMinLinkIndex={3}
+      />
       <CollisionDebugBoxes robotRoot={robotRt?.root ?? null} obstacleObjectById={obstacleObjectById} />
     </>
   );

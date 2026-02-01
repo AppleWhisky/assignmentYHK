@@ -56,6 +56,28 @@ const HOME_DEG_BY_NAME: Record<string, number> = {
   Tip_Rotation: 0,
 };
 
+// Joint limits (degrees). Hardcode for stability (model-specific).
+// Tune these values to match the intended robot constraints.
+const MIN_DEG_BY_NAME: Partial<Record<string, number>> = {
+  Arm01_Base_Rotation: -90,
+  Arm01_Arm_Rotation: -180,
+  Arm02_Base_Rotation: -155,
+  Arm02_Arm_Rotation: -180,
+  Arm03_Base_Rotation: -180,
+  Arm03_End_Rotation: -180,
+  Tip_Rotation: -180,
+};
+
+const MAX_DEG_BY_NAME: Partial<Record<string, number>> = {
+  Arm01_Base_Rotation: 90,
+  Arm01_Arm_Rotation: 180,
+  Arm02_Base_Rotation: 155,
+  Arm02_Arm_Rotation: 180,
+  Arm03_Base_Rotation: 180,
+  Arm03_End_Rotation: 180,
+  Tip_Rotation: 180,
+};
+
 function degToRad(deg: number) {
   return (deg * Math.PI) / 180;
 }
@@ -116,12 +138,16 @@ export function buildArm01Rig(root: Object3D, axisOverrides: Record<string, Axis
     const defaultAxis = DEFAULT_AXIS_BY_NAME[n.name];
     const axis: Axis = overridden ?? defaultAxis ?? detected ?? 'z';
     const homeAngleRad = degToRad(HOME_DEG_BY_NAME[n.name] ?? 0);
+    const minDeg = MIN_DEG_BY_NAME[n.name];
+    const maxDeg = MAX_DEG_BY_NAME[n.name];
     return {
       name: n.name,
       label: `J${idx + 1} ${(LABEL_BY_NAME[n.name] ?? n.name).replace(/_Rotation$/, '')}`,
       axis,
       angleRad: homeAngleRad,
       homeAngleRad,
+      minRad: typeof minDeg === 'number' ? degToRad(minDeg) : undefined,
+      maxRad: typeof maxDeg === 'number' ? degToRad(maxDeg) : undefined,
       stepRad: DEFAULT_JOINT_STEP_RAD,
     };
   });

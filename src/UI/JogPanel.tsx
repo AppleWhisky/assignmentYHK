@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 const SNAP_DEGS = [-180, -135, -90, -45, 0, 45, 90, 135, 180] as const;
 
-const HoldButton = (props: { label: string; onStep: () => void; children: ReactNode }) => {
+const HoldButton = (props: { label: string; onStep: () => void; children: ReactNode; disabled?: boolean }) => {
   const timeoutRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
 
@@ -23,7 +23,9 @@ const HoldButton = (props: { label: string; onStep: () => void; children: ReactN
       type="button"
       className="nudgeBtn"
       aria-label={props.label}
+      disabled={props.disabled}
       onPointerDown={(e) => {
+        if (props.disabled) return;
         e.stopPropagation();
         (e.currentTarget as HTMLButtonElement).setPointerCapture?.(e.pointerId);
         props.onStep(); // immediate
@@ -63,7 +65,11 @@ export const JogPanel = () => {
   const playback = useSimStore((s) => s.playback);
   const startPlayback = useSimStore((s) => s.startPlayback);
   const stopPlayback = useSimStore((s) => s.stopPlayback);
+  const playbackOptions = useSimStore((s) => s.playbackOptions);
+  const setPlaybackOptions = useSimStore((s) => s.setPlaybackOptions);
+  const setReportModalOpen = useSimStore((s) => s.setReportModalOpen);
   const [simError, setSimError] = useState<string | null>(null);
+  const isPlaying = playback.status === 'playing';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -106,7 +112,10 @@ export const JogPanel = () => {
 
             {playback.status === 'playing' ? (
               <button
-                onClick={() => stopPlayback()}
+                onClick={() => {
+                  stopPlayback('user');
+                  setReportModalOpen(true);
+                }}
                 style={{ fontSize: 11, borderColor: 'rgba(239, 68, 68, 0.45)' }}
               >
                 Stop
@@ -128,8 +137,27 @@ export const JogPanel = () => {
             )}
           </div>
 
+          <label
+            className="topHudToggle"
+            style={{ marginTop: 10, display: 'inline-flex' }}
+            title="If enabled, playback stops immediately when any collision occurs."
+          >
+            <input
+              type="checkbox"
+              checked={playbackOptions.stopOnCollision}
+              onChange={(e) => setPlaybackOptions({ stopOnCollision: e.target.checked })}
+              disabled={isPlaying}
+            />
+            Stop on collision
+          </label>
+
           {simError ? (
             <div style={{ marginTop: 8, fontSize: 12, color: '#ff9a3d' }}>Cannot play: {simError}</div>
+          ) : null}
+          {isPlaying ? (
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>
+              Playback running: Jog locked.
+            </div>
           ) : null}
           {presetAnimationsError ? (
             <div style={{ marginTop: 8, fontSize: 12, color: '#ff9a3d' }}>
@@ -162,10 +190,20 @@ export const JogPanel = () => {
       </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <button onClick={() => setSelected({ kind: 'robot' })} style={{ fontSize: 11 }}>
+        <button
+          onClick={() => setSelected({ kind: 'robot' })}
+          style={{ fontSize: 11 }}
+          disabled={isPlaying}
+          title={isPlaying ? 'Jog controls are locked during playback' : undefined}
+        >
           Move robot
         </button>
-        <button onClick={() => resetRobotPose()} style={{ fontSize: 11 }}>
+        <button
+          onClick={() => resetRobotPose()}
+          style={{ fontSize: 11 }}
+          disabled={isPlaying}
+          title={isPlaying ? 'Jog controls are locked during playback' : undefined}
+        >
           Reset pose
         </button>
       </div>
@@ -194,9 +232,12 @@ export const JogPanel = () => {
                 cursor: 'pointer',
               }}
               onClick={() => {
+                if (isPlaying) return;
                 setJointGizmoActive(false);
                 setSelected({ kind: 'robot' });
               }}
+              disabled={isPlaying}
+              title={isPlaying ? 'Jog controls are locked during playback' : undefined}
             >
               Base Yaw <span style={{ color: 'var(--muted)' }}>(Y)</span>
             </button>
@@ -208,6 +249,7 @@ export const JogPanel = () => {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
             <HoldButton
               label="Nudge Base Yaw -"
+              disabled={isPlaying}
               onStep={() => {
                 setJointGizmoActive(false);
                 setSelected({ kind: 'robot' });
@@ -229,10 +271,13 @@ export const JogPanel = () => {
                 setSelected({ kind: 'robot' });
                 setRobotYawRad(degToRad(Number(e.target.value)));
               }}
+              disabled={isPlaying}
+              title={isPlaying ? 'Jog controls are locked during playback' : undefined}
               style={{ flex: 1, margin: 0 }}
             />
             <HoldButton
               label="Nudge Base Yaw +"
+              disabled={isPlaying}
               onStep={() => {
                 setJointGizmoActive(false);
                 setSelected({ kind: 'robot' });
@@ -287,9 +332,12 @@ export const JogPanel = () => {
                         cursor: 'pointer',
                       }}
                       onClick={() => {
+                        if (isPlaying) return;
                         setSelected({ kind: 'joint', name: j.name });
                         setJointGizmoActive(true);
                       }}
+                      disabled={isPlaying}
+                      title={isPlaying ? 'Jog controls are locked during playback' : undefined}
                     >
                       {j.label} <span style={{ color: 'var(--muted)' }}>({j.axis.toUpperCase()})</span>
                     </button>
@@ -301,6 +349,7 @@ export const JogPanel = () => {
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
                     <HoldButton
                       label={`Nudge ${j.label} -`}
+                      disabled={isPlaying}
                       onStep={() => {
                         setSelected({ kind: 'joint', name: j.name });
                         setJointGizmoActive(true);
@@ -322,10 +371,13 @@ export const JogPanel = () => {
                         setJointGizmoActive(true);
                         setJointAngle(j.name, degToRad(Number(e.target.value)));
                       }}
+                      disabled={isPlaying}
+                      title={isPlaying ? 'Jog controls are locked during playback' : undefined}
                       style={{ flex: 1, margin: 0 }}
                     />
                     <HoldButton
                       label={`Nudge ${j.label} +`}
+                      disabled={isPlaying}
                       onStep={() => {
                         setSelected({ kind: 'joint', name: j.name });
                         setJointGizmoActive(true);

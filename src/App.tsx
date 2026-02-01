@@ -7,11 +7,13 @@ import { OverlayLayout } from '@/UI/layout/OverlayLayout';
 import { CollapsiblePanel } from '@/UI/CollapsiblePanel';
 import { useSimStore } from '@/store/useSimStore';
 import { AnimationEditorOverlay } from '@/UI/AnimationEditor/AnimationEditorOverlay';
+import { SimulationReportModal } from '@/UI/SimulationReport/SimulationReportModal';
 import { useEffect } from 'react';
 
 const App = () => {
   const severity = useSimStore((s) => s.collision.severity);
   const loadPresetAnimations = useSimStore((s) => s.loadPresetAnimations);
+  const hasReport = useSimStore((s) => s.playbackReport.length > 0);
   useEffect(() => {
     void loadPresetAnimations();
   }, [loadPresetAnimations]);
@@ -33,9 +35,10 @@ const App = () => {
               <JogPanel />
             </CollapsiblePanel>
           }
-          bottom={<BottomBar />}
+          bottom={hasReport ? <BottomBar /> : null}
         />
         <AnimationEditorOverlay />
+        <SimulationReportModal />
       </div>
     </div>
   );
